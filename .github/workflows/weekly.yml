@@ -41,3 +41,6 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: python -m agents.weekly.main
+      # learn: this week's 👍/👎 → each agent's preference list (bot_settings prefs:<agent>)
+      - if: always()
+        run: python -m agents.learn.main

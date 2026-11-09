@@ -14,6 +14,7 @@ import httpx
 
 from agents.channel.igkit import hookscore, humanize
 from lib.bot_data import bot_secret
+from lib.memory import learned
 
 MOODS = {"pop", "lofi", "electro", "chill", "trap"}
 MODEL = "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent"
@@ -101,7 +102,7 @@ how a phone charges without a cable). No science, food or body topics. Topics mu
 in 20-30 seconds with NO technical words and have a surprising answer that a teenager would want to share.
 {f'Inbar asked for: {request}. Follow it.' if request else ''}
 Already made (never repeat or paraphrase): {json.dumps(done[-80:], ensure_ascii=False)}
-Return JSON only: {{"topics": ["<topic in {LANG_NAME[lang]}>", ...]}} with exactly {n} topics.""")
+Return JSON only: {{"topics": ["<topic in {LANG_NAME[lang]}>", ...]}} with exactly {n} topics.""" + learned("channel"))
     topics = [t.strip() for t in out.get("topics", []) if isinstance(t, str) and t.strip()]
     if not topics:
         raise RuntimeError("no topics")

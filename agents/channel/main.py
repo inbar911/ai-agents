@@ -22,6 +22,7 @@ from typing import Any
 
 from agents.channel import beat, critic, voice, writer
 from lib.notify import request, send_image_file, send_telegram, send_video
+from lib.memory import remember
 from lib.supabase_client import log_run, sb
 
 ENGINE = Path(__file__).parent / "engine"
@@ -83,9 +84,11 @@ def publish(v: dict[str, Any]) -> int:
     post = f"{v['title']}\n\n{v['caption']}\n\n{' '.join(v['hashtags'])}"
     checked = f"\n\n🔎 נבדק מול: {', '.join(v['sources'])}" if v.get("sources") else "\n\n⚠️ בלי מחקר (החיפוש נכשל)"
     flag = FLAG[v["lang"]]
-    send_video(v["file"], f"{flag} 🎬 #{row['id']} {post}{checked}\n\n{critic.summary(v.get('review'))}"[:1024], "marketing")
+    send_video(v["file"], f"{flag} 🎬 #{row['id']} {post}{checked}\n\n{critic.summary(v.get('review'))}"[:1024], "marketing", agent="channel")
     if v["cover"]:
         send_image_file(v["cover"], f"{flag} 🖼️ קאבר לסרטון #{row['id']}", "marketing")
+    r = v.get("review")
+    remember("channel", f"made {v['lang']} reel #{row['id']} '{v['title']}' on: {v['topic']}" + (f" (critic {r['score']}/10)" if r else ""))
     send_telegram(f"{flag} 📋 כיתוב לסרטון #{row['id']}\n\n{post}", "marketing")   # its own message, so it copies in one tap
     return row["id"]
 

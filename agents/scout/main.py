@@ -21,6 +21,7 @@ from lib.scrapers.hn import fetch_hn
 from lib.scrapers.rss import fetch_rss
 from lib.llm import ask_json
 from lib.profile import who
+from lib.memory import learned
 from lib.supabase_client import log_run, sb
 
 MAX_AGE_HOURS = 24
@@ -94,7 +95,7 @@ def render_digest(items: list[dict[str, Any]]) -> str:
             f"You pick AI/tech news for Inbar, {who()}. From the items, choose the "
             f"{DIGEST_SIZE} most useful or exciting for him and explain each in ONE short plain Hebrew sentence "
             "(what it is + why it matters to a builder). No hype. "
-            'Return JSON: {"picks": [{"i": <item index>, "he": "<Hebrew sentence>"}]}',
+            'Return JSON: {"picks": [{"i": <item index>, "he": "<Hebrew sentence>"}]}' + learned("mail"),
             {"items": [{"i": k, "title": x["title"], "source": x["source"]} for k, x in enumerate(top)]},
             max_tokens=1200,
         )

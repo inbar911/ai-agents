@@ -12,6 +12,7 @@ from typing import Any
 from groq import BadRequestError, Groq, RateLimitError
 
 from lib.config import require
+from lib.memory import learned
 
 _client: Groq | None = None
 # llama-3.3-70b-versatile was decommissioned by Groq — every agent run 404'd
@@ -64,7 +65,7 @@ def _classify_batch(batch: list[dict[str, Any]]) -> list[dict[str, Any]]:
         }
         for e in batch
     ]
-    parsed = ask_json(GATEKEEPER_SYSTEM, payload, max_tokens=2000, temperature=0.2)
+    parsed = ask_json(GATEKEEPER_SYSTEM + learned("mail"), payload, max_tokens=2000, temperature=0.2)
     results = parsed.get("results")
     if not isinstance(results, list):
         for v in parsed.values():
@@ -217,7 +218,7 @@ def mine_ideas(
     if avoid_fingerprints:
         user_payload["avoid_slugs"] = list(avoid_fingerprints)[:40]
 
-    parsed = ask_json(PAIN_MINER_SYSTEM, user_payload, max_tokens=2500, temperature=0.6)
+    parsed = ask_json(PAIN_MINER_SYSTEM + learned("ideas"), user_payload, max_tokens=2500, temperature=0.6)
     ideas = parsed.get("ideas")
     if not isinstance(ideas, list):
         for v in parsed.values():

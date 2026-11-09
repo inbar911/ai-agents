@@ -20,6 +20,7 @@ import httpx
 from lib.bot_data import bot_secret, free_windows, il_today
 from lib.notify import send_telegram
 from lib.profile import profile
+from lib.memory import guidance, remember
 from lib.supabase_client import log_run, sb
 
 AHEAD = 7
@@ -86,7 +87,7 @@ What he uploaded to his study notebook for this subject (material names only; us
 Write in Hebrew (Spanish/English words may stay in their language when the subject needs it):
 - "focus": one or two sentences: what to study in today's session, fitting {days} day(s) before the exam (far: learn the topics; close: practice and gaps; tomorrow: light review).
 - "questions": 5 practice questions at a real 10th-grade exam level, from easy to hard, each with a short answer.
-Return JSON only: {{"focus": "...", "questions": [{{"q": "...", "a": "..."}}]}}"""
+Return JSON only: {{"focus": "...", "questions": [{{"q": "...", "a": "..."}}]}}""" + guidance("study")
     for _ in range(2):
         out = _gemini(prompt)
         if _valid(out):
@@ -117,8 +118,9 @@ def run() -> dict[str, Any]:
         qs = "\n".join(f"{i}. {q['q']}" for i, q in enumerate(plan["questions"], 1))
         ans = "\n".join(f"{i}. {q['a']}" for i, q in enumerate(plan["questions"], 1))
         parts.append(f"---\n📝 {exam['title']} · {'מחר' if days == 1 else f'בעוד {days} ימים'}\n🕐 {when}\n🎯 {plan['focus']}\n\n❓ שאלות תרגול:\n{qs}\n\n✅ תשובות (תנסה קודם לבד):\n{ans}")
+        remember("study", f"study session for '{exam['title']}' ({days} days left): {plan['focus']}"[:400], days=10)
         sent += 1
-    send_telegram("\n\n".join(parts), "morning")
+    send_telegram("\n\n".join(parts), "morning", agent="study")
     log_run("study", "ok", len(exams))
     return {"exams": len(exams), "sessions": sent}
 

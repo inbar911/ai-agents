@@ -68,15 +68,26 @@ def _check(res: httpx.Response) -> None:
         raise RuntimeError(f"{res.status_code} {reason}".strip())
 
 
-def send_telegram(md: str, bot: str = "jarvis", sections: bool = True) -> None:
-    """sections=True sends each ---separated part as its own message; False keeps it one message (split only past the limit)."""
+def _votes(agent: str | None) -> dict[str, str]:
+    """👍/👎 under a message. The press reaches the jarvis-telegram edge function (every agent bot's webhook points
+    there), lands in agent_feedback, and the weekly learn agent turns it into that agent's preferences."""
+    if not agent:
+        return {}
+    return {"reply_markup": json.dumps({"inline_keyboard": [[{"text": "👍", "callback_data": f"fb|{agent}|1"},
+                                                              {"text": "👎", "callback_data": f"fb|{agent}|-1"}]]})}
+
+
+def send_telegram(md: str, bot: str = "jarvis", sections: bool = True, agent: str | None = None) -> None:
+    """sections=True sends each ---separated part as its own message; False keeps it one message (split only past the limit).
+    `agent` adds 👍/👎 to every message, recorded under that agent's name (leave it out for errors and receipts)."""
     token = _secret(f"tg_{bot}") or _secret("telegram_token")
     if not token:
         raise RuntimeError("missing bot secret: telegram_token")
     dest = _destination(bot)
     with httpx.Client(timeout=20) as client:
         for chunk in _chunks(_plain(md), sections):
-            res = client.post(f"https://api.telegram.org/bot{token}/sendMessage", json={**dest, "text": chunk})
+            votes = {"reply_markup": json.loads(_votes(agent)["reply_markup"])} if agent else {}
+            res = client.post(f"https://api.telegram.org/bot{token}/sendMessage", json={**dest, "text": chunk, **votes})
             _check(res)
 
 
@@ -92,9 +103,9 @@ def _send_file(method: str, field: str, path: "os.PathLike[str]", name: str, mim
         _check(res)
 
 
-def send_video(path: "os.PathLike[str]", caption: str, bot: str = "jarvis") -> None:
+def send_video(path: "os.PathLike[str]", caption: str, bot: str = "jarvis", agent: str | None = None) -> None:
     """The file itself (bots may upload up to 50MB), so Inbar can save it straight from Telegram."""
-    _send_file("sendVideo", "video", path, "video.mp4", "video/mp4", caption, bot, {"supports_streaming": "true"})
+    _send_file("sendVideo", "video", path, "video.mp4", "video/mp4", caption, bot, {"supports_streaming": "true", **_votes(agent)})
 
 
 def send_image_file(path: "os.PathLike[str]", caption: str, bot: str = "jarvis") -> None:
@@ -107,7 +118,7 @@ def request() -> str:
     return os.getenv("AGENT_REQUEST", "").strip()[:500]
 
 
-def notify(subject: str, body_md: str, body_html: str | None = None, bot: str = "jarvis", sections: bool = True) -> None:
+def notify(subject: str, body_md: str, body_html: str | None = None, bot: str = "jarvis", sections: bool = True, agent: str | None = None) -> None:
     """Both channels; one failing doesn't stop the other, but any failure is raised at the end."""
     errors: list[str] = []
     try:
@@ -115,7 +126,7 @@ def notify(subject: str, body_md: str, body_html: str | None = None, bot: str = 
     except Exception as e:  # noqa: BLE001 — report every channel, then fail loudly
         errors.append(f"email: {e}")
     try:
-        send_telegram(f"{subject}\n\n{body_md}", bot, sections)
+        send_telegram(f"{subject}\n\n{body_md}", bot, sections, agent)
     except Exception as e:  # noqa: BLE001
         errors.append(f"telegram: {e}")
     if errors:

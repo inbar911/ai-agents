@@ -15,6 +15,7 @@ from typing import Any
 
 from agents.marketer.products import PRODUCTS
 from lib.llm import ask_json
+from lib.memory import guidance
 from lib.notify import notify, request, send_telegram
 from lib.supabase_client import log_run, sb
 
@@ -44,7 +45,7 @@ def _recent_hooks(product: str, limit: int = 30) -> list[str]:
 
 
 def _generate(product: dict[str, str], avoid: list[str]) -> list[dict[str, str]]:
-    out = ask_json(SYSTEM, {"product": product, "avoid_hooks": avoid, "request": request() or None}, max_tokens=5000, temperature=0.8)
+    out = ask_json(SYSTEM + guidance("marketer"), {"product": product, "avoid_hooks": avoid, "request": request() or None}, max_tokens=5000, temperature=0.8)
     ideas = out.get("ideas")
     out: list[dict[str, str]] = []
     for i in ideas if isinstance(ideas, list) else []:
@@ -82,7 +83,7 @@ def run() -> dict[str, Any]:
             raise RuntimeError("model returned no usable ideas")
         sb().table("content_ideas").insert([{**i, "product": product["name"]} for i in ideas]).execute()
         report = _render(product, ideas)
-        notify(f"🎥 שיווק — {product['name']} — {date.today():%d/%m}", report, bot="marketing")
+        notify(f"🎥 שיווק — {product['name']} — {date.today():%d/%m}", report, bot="marketing", agent="marketer")
         log_run("marketer", "ok", len(ideas))
         return {"product": product["name"], "ideas": len(ideas), "report": report}
     except Exception as e:

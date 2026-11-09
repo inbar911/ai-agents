@@ -26,6 +26,7 @@ import httpx
 from lib.bot_data import bot_secret
 from lib.notify import send_telegram
 from lib.profile import who
+from lib.memory import remember
 from lib.supabase_client import log_run, sb
 
 INLINE_LIMIT = 19 * 1024 * 1024  # Gemini inline_data cap is 20MB per request
@@ -145,6 +146,7 @@ def _process(job: dict[str, Any]) -> bool:
             "status": "done", "title": summary["title"], "summary": {**summary, "category": category}, "category": category, "tags": tags,
             "done_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", job["id"]).execute()
+        remember("videos", f"saved to knowledge: '{summary['title']}' ({category}): {summary['gist']}"[:400])
         return True
     except Exception as e:  # noqa: BLE001 — every job gets a status and a message
         error = str(e)[:300]

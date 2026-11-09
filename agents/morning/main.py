@@ -16,6 +16,7 @@ from lib.llm import ask_json
 from lib.mailer import fetch_recent_emails
 from lib.notify import notify
 from lib.profile import who
+from lib.memory import guidance, remember
 from lib.supabase_client import log_run
 
 DAYS_HE = ["שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת", "ראשון"]
@@ -37,7 +38,7 @@ def run() -> dict[str, Any]:
         emails = fetch_recent_emails(hours=24, max_messages=25)
         headers = [{"from": e["from"], "subject": e["subject"]} for e in emails]
 
-        out = ask_json(SYSTEM.replace("{who}", who()), {"calendar": events or [], "emails": headers, "tasks": tasks, "free_windows": windows}, max_tokens=3000)
+        out = ask_json(SYSTEM.replace("{who}", who()) + guidance("morning"), {"calendar": events or [], "emails": headers, "tasks": tasks, "free_windows": windows}, max_tokens=3000)
         email_lines = [e for e in out.get("emails", []) if isinstance(e, dict) and isinstance(e.get("line"), str)][:8]
         focus = out.get("focus") if isinstance(out.get("focus"), str) else ""
 
@@ -55,7 +56,9 @@ def run() -> dict[str, Any]:
             lines += ["", "---", f"🎯 הכי חשוב היום: {focus}"]
         report = "\n".join(lines)
 
-        notify(f"☀️ פתיחת בוקר — {today:%d/%m}", report, bot="morning")
+        notify(f"☀️ פתיחת בוקר — {today:%d/%m}", report, bot="morning", agent="morning")
+        if focus:
+            remember("morning", f"today's focus: {focus}", days=2)
         log_run("morning_brief", "ok", len(events or []))
         return {"report": report}
     except Exception as e:

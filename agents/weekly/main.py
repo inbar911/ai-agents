@@ -17,6 +17,7 @@ from lib.llm import ask_json
 from lib.mailer import fetch_recent_emails
 from lib.notify import notify
 from lib.profile import who
+from lib.memory import guidance
 from lib.supabase_client import log_run, sb
 
 IDEAS_SYSTEM = """Generate 15 NEW viral app / micro-SaaS ideas for {who}
@@ -61,7 +62,7 @@ def run() -> dict[str, Any]:
         stats = week_stats()
 
         past = sb().table("ideas_history").select("title").order("created_at", desc=True).limit(40).execute().data or []
-        ideas_out = ask_json(IDEAS_SYSTEM.replace("{who}", who()), {"avoid_titles": [p["title"] for p in past]}, max_tokens=5500, temperature=0.9)
+        ideas_out = ask_json(IDEAS_SYSTEM.replace("{who}", who()) + guidance("weekly"), {"avoid_titles": [p["title"] for p in past]}, max_tokens=5500, temperature=0.9)
         ideas = [i for i in ideas_out.get("ideas", []) if isinstance(i, dict) and isinstance(i.get("name"), str)][:15]
 
         # gpt-oss spends part of max_tokens on reasoning, and input + max_tokens must fit the 8k/minute free tier.
@@ -86,7 +87,7 @@ def run() -> dict[str, Any]:
         lines += [f"- {x['line']} — {x.get('url', '')}" for x in news if isinstance(x, dict) and isinstance(x.get("line"), str)] or ["אין עדכונים השבוע."]
         report = "\n".join(lines)
 
-        notify(f"סיכום שבועי — אינבר ({today:%d/%m})", report, bot="weekly")
+        notify(f"סיכום שבועי — אינבר ({today:%d/%m})", report, bot="weekly", agent="weekly")
         log_run("weekly_summary", "ok", len(ideas))
         return {"report": report}
     except Exception as e:

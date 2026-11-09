@@ -30,6 +30,7 @@ from agents.scout.main import run as scout_run
 from lib.llm import ask_json, review_ideas
 from lib.notify import notify, request
 from lib.profile import who
+from lib.memory import guidance
 from lib.scrapers.finance import fetch_all_quotes
 from lib.scrapers.youtube import pick_long_form
 from lib.supabase_client import log_run, sb
@@ -115,7 +116,7 @@ async def daily_run() -> dict[str, Any]:
         f"{sc_md}\n"
     )
     body_html = _md_to_html(body_md)
-    notify(subject, body_md, body_html, bot="mail", sections=False)   # one Telegram message a day, not one per section
+    notify(subject, body_md, body_html, bot="mail", sections=False, agent="mail")   # one Telegram message a day, not one per section
     log_run("orchestrator", "ok_daily", 1)
     print("[orchestrator] daily brief sent", file=sys.stderr)
     return {"mode": "daily", "sent": True}
@@ -207,7 +208,7 @@ async def weekend_run() -> dict[str, Any]:
     label = _now_local_label()
     subject = f"Weekend report — {label}"
     body_html = _md_to_html(body_md)
-    notify(subject, body_md, body_html, bot="ideas")
+    notify(subject, body_md, body_html, bot="ideas", agent="ideas")
     log_run("orchestrator", "ok_weekend", 1)
     print("[orchestrator] weekend report sent", file=sys.stderr)
     return {"mode": "weekend", "sent": True, "reviews": len(reviews)}
@@ -242,7 +243,7 @@ async def report_run() -> dict[str, Any]:
     label = _now_local_label()
     subject = f"Weekend report — {label}"
     body_html = _md_to_html(body_md)
-    notify(subject, body_md, body_html, bot="ideas")
+    notify(subject, body_md, body_html, bot="ideas", agent="ideas")
     log_run("orchestrator", "ok_report", 1)
     print("[orchestrator] consolidated weekend report sent", file=sys.stderr)
     return {"mode": "report", "sent": True, "reviews": len(reviews)}
@@ -262,7 +263,7 @@ async def ideas_run() -> dict[str, Any]:
         return {"mode": "ideas", "sent": False}
     label = _now_local_label()
     subject = f"💡 הזדמנויות Micro-SaaS — {label}"
-    notify(subject, result["report"], _md_to_html(result["report"]), bot="ideas")
+    notify(subject, result["report"], _md_to_html(result["report"]), bot="ideas", agent="ideas")
     log_run("orchestrator", "ok_ideas", len(result["ideas"]))
     return {"mode": "ideas", "sent": True, "ideas": len(result["ideas"])}
 
@@ -273,13 +274,13 @@ around a specific theme. Give 5 concrete, buildable ideas. Hebrew. Return JSON o
 
 
 async def _requested_ideas(req: str) -> dict[str, Any]:
-    out = ask_json(REQUEST_IDEAS_SYSTEM.replace("{who}", who()), {"request": req}, max_tokens=4000, temperature=0.8)
+    out = ask_json(REQUEST_IDEAS_SYSTEM.replace("{who}", who()) + guidance("ideas"), {"request": req}, max_tokens=4000, temperature=0.8)
     ideas = [i for i in out.get("ideas", []) if isinstance(i, dict) and isinstance(i.get("title"), str)][:5]
     lines = [f"# 💡 5 רעיונות לפי הבקשה: {req}", ""]
     for n, i in enumerate(ideas, 1):
         lines += [f"## {n}. {i['title']}", f"בעיה: {i.get('problem', '')}", f"למי: {i.get('target_user', '')}", f"פתרון: {i.get('solution', '')}", ""]
     report = "\n".join(lines).rstrip()
-    notify(f"💡 הזדמנויות — {req[:60]}", report, _md_to_html(report), bot="ideas")
+    notify(f"💡 הזדמנויות — {req[:60]}", report, _md_to_html(report), bot="ideas", agent="ideas")
     log_run("orchestrator", "ok_ideas_request", len(ideas))
     return {"mode": "ideas", "sent": True, "ideas": len(ideas)}
 
