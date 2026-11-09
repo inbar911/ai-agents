@@ -18,7 +18,6 @@ concurrency:
 
 permissions:
   contents: read
-  actions: read   # quota guard counts this month's Actions minutes
 
 jobs:
   run:
@@ -45,8 +44,6 @@ jobs:
       # study coach: today's session + practice questions for exams in the next 7 days (quiet otherwise)
       - if: always()
         run: python -m agents.study.main
-      # quota guard: GitHub minutes this month + Gemini limit failures; warns on Telegram, snapshot for the dashboard
+      # quota guard: Gemini limit failures in the last day; warns on Telegram, snapshot for the dashboard
       - if: always()
         run: python -m agents.quota.main
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
