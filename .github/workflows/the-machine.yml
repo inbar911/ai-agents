@@ -1,0 +1,53 @@
+name: THE MACHINE - Intelligence Scan
+
+# Hits jarvis-web's /api/machine/scan once per day — end-of-day digest.
+# Runs 5 DEEP studies (Israel conflicts / AI danger + AGI / Anthropic
+# updates / Israel active fronts / AI money-making), writes briefs to
+# Supabase, and emails Sir an HTML digest.
+#
+# Lives in ai-agents (not jarvis-web) because AGENTS_GITHUB_PAT is scoped
+# to this repo — workflow_dispatch from /api/machine/trigger hits THIS file.
+
+on:
+# PAUSED 2026-10-09: JARVIS moved off Vercel and now runs on Inbar's
+# machine only, so this workflow has no public URL to call. The job
+# lives in the JOBS panel inside the local app. Restore by
+# un-commenting the schedule below (and pointing it at a reachable host).
+#  schedule:
+#    # 19:00 UTC daily = 22:00 Israel (IDT, summer) / 21:00 IST (winter)
+#    # End-of-day digest lands in Inbar's inbox at night.
+#    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: the-machine
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Fire scan endpoint
+        env:
+          MACHINE_SCAN_TOKEN: ${{ secrets.MACHINE_SCAN_TOKEN }}
+        run: |
+          if [ -z "$MACHINE_SCAN_TOKEN" ]; then
+            echo "::error::MACHINE_SCAN_TOKEN is not configured in repo secrets"
+            exit 1
+          fi
+          echo "Firing The Machine scan at $(date -u +%FT%TZ) UTC"
+          HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" \
+            -X POST https://jarvis-web-six-xi.vercel.app/api/machine/scan \
+            -H "X-Machine-Token: ${MACHINE_SCAN_TOKEN}" \
+            --max-time 600)
+          echo "HTTP: ${HTTP_CODE}"
+          cat response.json
+          echo ""
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Scan endpoint returned ${HTTP_CODE}"
+            exit 1
+          fi

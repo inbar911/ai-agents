@@ -1,0 +1,31 @@
+name: channel-critic
+
+# Manual: run the channel's reviewer on videos already made (e.g. "29 28") to check its judgment.
+on:
+  workflow_dispatch:
+    inputs:
+      ids:
+        description: "channel_videos ids, space separated"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      PYTHONUNBUFFERED: "1"
+      IDS: ${{ inputs.ids }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: pip install -r requirements.txt
+      - run: for id in $IDS; do [[ "$id" =~ ^[0-9]+$ ]] && python -m agents.channel.critic "$id"; done

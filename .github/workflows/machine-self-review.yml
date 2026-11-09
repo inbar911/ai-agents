@@ -1,0 +1,47 @@
+name: THE MACHINE - Self-Review (read-only proposals)
+
+# Daily self-review: THE MACHINE reads its OWN code (read-only, scoped),
+# proposes 0-3 improvements, stores them in Supabase machine_proposals,
+# and emails Sir. No code is ever written or pushed by the machine.
+# Sir approves in the UI; Claude implements in a manual session.
+#
+# Fires 16:00 UTC = 19:00 Israel (IDT) — one hour before the curator
+# Claude routine that picks the best proposals and emails Sir a curated list.
+
+on:
+# PAUSED 2026-10-09: JARVIS moved off Vercel and now runs on Inbar's
+# machine only, so this workflow has no public URL to call. The job
+# lives in the JOBS panel inside the local app. Restore by
+# un-commenting the schedule below (and pointing it at a reachable host).
+#  schedule:
+#    - cron: '0 16 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: machine-self-review
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Fire self-review endpoint
+        env:
+          MACHINE_SCAN_TOKEN: ${{ secrets.MACHINE_SCAN_TOKEN }}
+        run: |
+          if [ -z "$MACHINE_SCAN_TOKEN" ]; then
+            echo "::error::MACHINE_SCAN_TOKEN not configured"; exit 1
+          fi
+          echo "Firing self-review at $(date -u +%FT%TZ)"
+          HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" \
+            -X POST https://jarvis-web-six-xi.vercel.app/api/machine/self-review \
+            -H "X-Machine-Token: ${MACHINE_SCAN_TOKEN}" \
+            --max-time 120)
+          echo "HTTP: ${HTTP_CODE}"; cat response.json; echo ""
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::self-review returned ${HTTP_CODE}"; exit 1
+          fi

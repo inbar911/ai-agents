@@ -1,0 +1,50 @@
+name: JARVIS Self-Maintenance
+
+# Nightly: curate the shared sir_profile (prune stale + merge duplicates so
+# the learned brain stays sharp), health-check the critical surfaces, and
+# email Sir a status report. Keeps JARVIS + the machine getting cleaner and
+# catching regressions without any code changes — runtime self-improvement.
+#
+# Lives in ai-agents (the MACHINE_SCAN_TOKEN secret is here). Curls
+# jarvis-web's /api/self-improve with the secret header.
+
+on:
+# PAUSED 2026-10-09: JARVIS moved off Vercel and now runs on Inbar's
+# machine only, so this workflow has no public URL to call. The job
+# lives in the JOBS panel inside the local app. Restore by
+# un-commenting the schedule below (and pointing it at a reachable host).
+#  schedule:
+#    - cron: '0 2 * * *'   # 02:00 UTC daily
+  workflow_dispatch:
+
+concurrency:
+  group: jarvis-self-improve
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  maintain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Fire self-improve endpoint
+        env:
+          MACHINE_SCAN_TOKEN: ${{ secrets.MACHINE_SCAN_TOKEN }}
+        run: |
+          if [ -z "$MACHINE_SCAN_TOKEN" ]; then
+            echo "::error::MACHINE_SCAN_TOKEN not configured in repo secrets"
+            exit 1
+          fi
+          echo "Self-maintenance at $(date -u +%FT%TZ) UTC"
+          HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" \
+            -X POST https://jarvis-web-six-xi.vercel.app/api/self-improve \
+            -H "X-Machine-Token: ${MACHINE_SCAN_TOKEN}" \
+            --max-time 120)
+          echo "HTTP: ${HTTP_CODE}"
+          cat response.json; echo ""
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::self-improve returned ${HTTP_CODE}"
+            exit 1
+          fi

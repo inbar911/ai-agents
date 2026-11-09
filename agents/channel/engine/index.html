@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="he">
+<head>
+<meta charset="utf-8">
+<title>channel video</title>
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;overflow:hidden;-webkit-font-smoothing:antialiased;font-family:'Noto Sans Hebrew',sans-serif}
+#scenes{position:absolute;left:0;top:0;width:100%;height:100%}
+.scene{position:absolute;left:0;top:0;overflow:hidden;display:none}
+.a{position:absolute;left:0;top:0}
+.g{position:absolute;width:0;height:0;transform-origin:0 0}
+.tx{position:absolute;left:0;top:0;white-space:nowrap}
+svg{overflow:visible;display:block}
+</style>
+<script src="timing.js"></script>
+<script src="video.js"></script>
+<script>
+// render.py and audio.py read these settings from here.
+window.CONFIG = {
+  W: 1080, H: 1920,
+  DUR: Math.ceil((TIMING[TIMING.length - 1].b + 1.2) * 10) / 10,
+  FPS: 30,
+  bg: '#04030f',
+  loop: false,
+  hold: 0.8,
+  bpm: VIDEO.bpm || 104, beat0: 0,
+  music: { file: 'mix.wav', start: 0, gain: 0 }, snap: false,
+};
+</script>
+</head>
+<body>
+<div id="stage"><div id="scenes"></div></div>
+<script type="importmap">{"imports": {"three": "./vendor/three.module.min.js"}}</script>
+<script src="core.js"></script>
+<script src="world.js"></script>
+</body>
+</html>

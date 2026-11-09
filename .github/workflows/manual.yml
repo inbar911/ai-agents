@@ -1,0 +1,67 @@
+name: manual
+
+# Single-agent manual trigger. Called by Jarvis voice commands +
+# the AGENTS panel "Run" buttons via GitHub REST workflow_dispatch.
+#
+# Inputs:
+#   agent: one of cipher | pulse | forge | nexus
+#     cipher → Gatekeeper (Inbox Triage)
+#     pulse  → Scout (AI Pulse)
+#     forge  → Pain-Miner (Idea Forge)
+#     nexus  → Orchestrator daily brief
+
+on:
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: "Which agent to run"
+        required: true
+        type: choice
+        options:
+          - cipher
+          - pulse
+          - forge
+          - nexus
+          - ideas
+          - marketer
+
+concurrency:
+  group: manual-${{ inputs.agent }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GMAIL_USER: ${{ secrets.GMAIL_USER }}
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+      REPORT_TO_EMAIL: ${{ secrets.REPORT_TO_EMAIL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run agent
+        run: |
+          case "${{ inputs.agent }}" in
+            cipher) python -m agents.gatekeeper.main ;;
+            pulse)  python -m agents.scout.main ;;
+            forge)  python -m agents.pain_miner.main ;;
+            nexus)  python -m agents.orchestrator.main report ;;
+            ideas)  python -m agents.orchestrator.main ideas ;;
+            marketer) python -m agents.marketer.main ;;
+            *) echo "Unknown agent: ${{ inputs.agent }}" >&2; exit 2 ;;
+          esac
+      - name: Send brief email (manual runs only)
+        if: ${{ inputs.agent != 'nexus' && inputs.agent != 'ideas' && inputs.agent != 'marketer' }}
+        run: python -m agents.orchestrator.main report

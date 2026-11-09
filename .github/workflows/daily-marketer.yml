@@ -1,0 +1,57 @@
+name: daily-marketer
+
+# 15:00 IL (winter) / 16:00 (summer). Channel agent -> 4 animated explainer Reels (1 HE + 3 EN) for Inbar's
+# Instagram channel: Supabase Storage + dashboard + the videos themselves in the marketing topic on Telegram.
+
+on:
+  # scheduled from Supabase pg_cron (agent-channel, 13:00 UTC = 15:00 Israel)
+  workflow_dispatch:
+    inputs:
+      request:
+        description: "What Inbar asked JARVIS for (optional, steers the topics)"
+        required: false
+        type: string
+        default: ""
+      en:
+        description: "English videos (0-6)"
+        required: false
+        type: string
+        default: "3"
+      he:
+        description: "Hebrew videos (0-6)"
+        required: false
+        type: string
+        default: "1"
+
+concurrency:
+  group: daily-marketer
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GMAIL_USER: ${{ secrets.GMAIL_USER }}
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+      REPORT_TO_EMAIL: ${{ secrets.REPORT_TO_EMAIL }}
+      PYTHONUNBUFFERED: "1"
+      # Passed through env, never interpolated into a shell line.
+      AGENT_REQUEST: ${{ inputs.request }}
+      CHANNEL_EN: ${{ inputs.en || '3' }}
+      CHANNEL_HE: ${{ inputs.he || '1' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: pip install -r requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: python -m agents.channel.main

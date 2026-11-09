@@ -1,0 +1,43 @@
+name: sat-nexus
+
+# Saturday 08:00 UTC = 11:00 IST (DST) / 10:00 IST (winter).
+# Final step of the week: read CIPHER/PULSE/FORGE outputs from DB,
+# review ideas against AI trends, add finance + YouTube pick,
+# send ONE consolidated weekend email to Sir.
+
+on:
+# PAUSED 2026-10-09: Inbar stopped the Saturday agents. Emails were
+# already silenced, so a run only wrote to Supabase and he never saw it.
+# Restore by un-commenting the schedule below. workflow_dispatch stays,
+# so the agent can still be fired by hand from the Actions tab.
+#  schedule:
+#    - cron: "0 8 * * 6"
+  workflow_dispatch: {}
+
+concurrency:
+  group: sat-nexus
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GMAIL_USER: ${{ secrets.GMAIL_USER }}
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+      REPORT_TO_EMAIL: ${{ secrets.REPORT_TO_EMAIL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m agents.orchestrator.main report

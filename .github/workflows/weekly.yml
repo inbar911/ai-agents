@@ -1,0 +1,43 @@
+name: weekly
+
+# Saturday 21:00 IL (winter) / 22:00 (summer). Weekly summary: JARVIS week, 15 app ideas, email by category, AI news — email + Telegram.
+
+on:
+  # scheduled from Supabase pg_cron (jarvis-web migration 20261104070000_agent_schedules); GitHub cron was hours late
+  workflow_dispatch:
+    inputs:
+      request:
+        description: "What Inbar asked JARVIS for (optional)"
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: weekly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GMAIL_USER: ${{ secrets.GMAIL_USER }}
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+      REPORT_TO_EMAIL: ${{ secrets.REPORT_TO_EMAIL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      PYTHONUNBUFFERED: "1"
+      # Passed through env, never interpolated into a shell line.
+      AGENT_REQUEST: ${{ inputs.request }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m agents.weekly.main
