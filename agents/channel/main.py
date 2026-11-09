@@ -22,6 +22,7 @@ from typing import Any
 
 from agents.channel import beat, critic, voice, writer
 from lib.notify import request, send_image_file, send_telegram, send_video
+from lib.bot_data import il_today
 from lib.memory import remember
 from lib.supabase_client import log_run, sb
 
@@ -139,11 +140,24 @@ def _drop(v: dict[str, Any]) -> None:
     return None
 
 
+def _today_plan() -> list[tuple[str, int]]:
+    """JARVIS can change today's count (bot_settings.channel_today = {"date", "he", "en"}); otherwise PLAN."""
+    try:
+        rows = sb().table("bot_settings").select("value").eq("key", "channel_today").execute().data or []
+        o = json.loads(rows[0]["value"]) if rows else {}
+        if o.get("date") == il_today().isoformat():
+            return [("he", max(0, min(3, int(o.get("he", 1))))), ("en", max(0, min(5, int(o.get("en", 3)))))]
+    except Exception as e:  # noqa: BLE001
+        print(f"[channel] override ignored: {e}", file=sys.stderr)
+    return PLAN
+
+
 def run() -> dict[str, Any]:
     rows = sb().table("channel_videos").select("topic,lang").order("created_at").execute().data or []
     made, failed, n = [], [], 0
-    total = sum(c for _, c in PLAN if c > 0)
-    for lang, count in PLAN:
+    plan = _today_plan()
+    total = sum(c for _, c in plan if c > 0)
+    for lang, count in plan:
         if count <= 0:
             continue
         done = [r["topic"] for r in rows if (r.get("lang") or "he") == lang]

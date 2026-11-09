@@ -1,0 +1,37 @@
+name: study
+
+# On demand from JARVIS ("an extra study session / questions now"): the study coach with Inbar's request.
+on:
+  workflow_dispatch:
+    inputs:
+      request:
+        description: "What Inbar asked for (steers the session)"
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: study
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      PYTHONUNBUFFERED: "1"
+      # Passed through env, never interpolated into a shell line.
+      AGENT_REQUEST: ${{ inputs.request }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m agents.study.main
