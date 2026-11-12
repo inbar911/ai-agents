@@ -180,7 +180,7 @@ def write_script(topic: str, lang: str = "he", hooks: list[str] | None = None, n
     found = research(topic)
     facts = ("Researched facts (from a web search) — build the explanation ONLY on these; never add a number or claim "
              "that is not here:\n" + "\n".join(f"- {f}" for f in found["facts"])) if found["facts"] else ""
-    out = _gemini(f"""Write a 20-30 second {LANG_NAME[lang]} Instagram Reel script that explains: {topic}
+    prompt = f"""Write a 20-30 second {LANG_NAME[lang]} Instagram Reel script that explains: {topic}
 {facts}
 {CANDIDATES.format(chr(10).join(f"- {h}" for h in hooks)) if hooks else ""}
 {REMAKE.format(notes) if notes else ""}
@@ -188,7 +188,10 @@ Who watches: a 16-year-old scrolling fast who knows NOTHING technical and will s
 The video is ONE dark neon hologram world that tells the story: the real objects involved stand in it as glowing 3D
 models, the camera flies to the object each line talks about, and the objects interact (a router beams data to the
 phone, a tower sends waves). When the story comes back to an object, use the same object again (the router stays
-the router). For each line also pick a "symbol" that pops up over the object to show what the line says: the line
+the router). But keep the picture moving: a DIFFERENT model on most lines, never more than 2 lines in a row on the
+same model, and at least 5 different models in the video (the parts of the process: where it starts, what carries it,
+what receives it, who uses it). A fact about one thing (a number, an ID, a code) goes on a related model with a symbol
+or a count, not on the same object again and again. For each line also pick a "symbol" that pops up over the object to show what the line says: the line
 says "Wi-Fi" → wifi over the router; "password" → lock over the phone; "signal" → signal; "notification" → bell.
 Pick the visuals that show exactly what each line is about.
 Rules that matter more than anything:
@@ -245,8 +248,30 @@ Return JSON only:
   "segments": [{{"text": "<line>", "tone": "<English voice direction: energetic, amazed, playful, dramatic...>",{SAY if lang == "he" else ""}
                  "focus": "<object (or a symbol when no object fits)>", "symbol": "<symbol shown over it, optional>", "action": "<action>", "target": "<object, only for beam>",
                  "label": "<optional 1-2 words floating over it>", "value": <number, only for count>,
-                 "suffix": "<only for count>"}}]}}""")
-    return {**_valid_script(out, lang), "lang": lang, "sources": found["sources"], "researched": bool(found["facts"])}
+                 "suffix": "<only for count>"}}]}}"""
+    script = _valid_script(_gemini(prompt), lang)
+    problem = _variety_problem(script["segments"])
+    if problem:   # one rewrite: a video stuck on one model looks empty (Inbar on #43: a soda can on 8 of 11 lines)
+        print(f"[channel] variety: {problem}; rewriting", file=sys.stderr)
+        retry = _valid_script(_gemini(prompt + f"\n\nYour last script broke the variety rule: {problem}. Rewrite it with more different models."), lang)
+        if not _variety_problem(retry["segments"]) or _distinct(retry["segments"]) > _distinct(script["segments"]):
+            script = retry
+    return {**script, "lang": lang, "sources": found["sources"], "researched": bool(found["facts"])}
+
+
+def _distinct(segs: list[dict[str, Any]]) -> int:
+    return len({s["focus"] for s in segs})
+
+
+def _variety_problem(segs: list[dict[str, Any]]) -> str | None:
+    """None when the script keeps the picture moving: at least 5 models (or one per 2 lines in a short one), no 3 lines in a row on one."""
+    need = min(5, (len(segs) + 1) // 2)
+    if _distinct(segs) < need:
+        return f"only {_distinct(segs)} different models in {len(segs)} lines (need {need})"
+    for i in range(len(segs) - 2):
+        if segs[i]["focus"] == segs[i + 1]["focus"] == segs[i + 2]["focus"]:
+            return f"'{segs[i]['focus']}' on 3 lines in a row (lines {i + 1}-{i + 3})"
+    return None
 
 
 FOLLOW = {"he": ("*תעקבו*.", "אוהבים סודות כאלה? *תעקבו*.", ("תעקבו", "עקבו")),
