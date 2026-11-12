@@ -77,7 +77,9 @@
         fragmentShader: 'uniform vec3 c; varying vec3 n; varying vec3 v; void main(){ float r = pow(1.0 - abs(dot(normalize(n), normalize(v))), 2.2); gl_FragColor = vec4(c * (0.11 + 1.25 * r), 1.0); }',
       });
       function neonize(root, c) {
-        const col = new THREE.Color(c), white = new THREE.Color(0xffffff);
+        // additive glow stacks up: a dense model with many overlapping parts (a NASA rover) burns out to white, so dim it
+        let tris = 0; root.traverse(o => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+        const col = new THREE.Color(c).multiplyScalar(tris > 30000 ? Math.max(0.3, Math.sqrt(30000 / tris)) : 1), white = new THREE.Color(0xffffff);
         const edge = new THREE.LineBasicMaterial(Object.assign({ color: col.clone().lerp(white, 0.35), opacity: 0.95 }, ADD)), rim = RIM(c);
         const edgeLight = new THREE.LineBasicMaterial(Object.assign({ color: col.clone().lerp(white, 0.55), opacity: 0.9 }, ADD)), rimLight = RIM(col.clone().lerp(white, 0.3));
         const meshes = []; root.traverse(o => { if (o.isMesh) meshes.push(o); });
@@ -87,7 +89,9 @@
           if (m.material.emissive && m.material.emissive.getHex() !== 0 && m.material.emissiveIntensity >= 1) { m.material = new THREE.MeshBasicMaterial(Object.assign({ color: m.material.emissive }, ADD)); continue; }   // LEDs
           const light = m.material === M.white || m.material === M.chrome;   // white/chrome details (a rune, a shackle) read as the bright part
           m.material = light ? rimLight : rim;
-          m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 15), light ? edgeLight : edge));
+          // glowing edges, except on very dense meshes (big NASA models): there they'd be a solid blur and cost render time
+          const tris = (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3;
+          if (tris < 40000) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 15), light ? edgeLight : edge));
         }
       }
 
@@ -234,6 +238,23 @@
           return group(ext(s, sym(c)), ...[0.3, 0.55].map(r => { const m = ext(arc(r, r + 0.1, -Math.PI / 4, Math.PI / 4), sym(c), 0.1); m.position.x = 0.12 + r * 0.6; return m; })); },
         camera_icon: (c) => group(rbox(1.4, 0.95, 0.3, 0.2, sym(c), [0, 0, 0]), cyl(0.3, 0.3, 0.12, M.lens, [0, 0, 0.18], [Math.PI / 2, 0, 0]), cyl(0.36, 0.36, 0.1, M.chrome, [0, 0, 0.15], [Math.PI / 2, 0, 0]), rbox(0.36, 0.16, 0.2, 0.06, sym(c), [-0.3, 0.52, 0])),
       };
+      // ─── library models (engine/models, the ones this script uses packed into models.js by the agent): each is
+      // centred, sits on y = 0 and is ~1.8 units at its largest side, then gets the same hologram skin as the code models ───
+      const { GLTFLoader } = await import('./vendor/jsm/loaders/GLTFLoader.js');
+      const gltfLoader = new GLTFLoader();
+      for (const [name, b64] of Object.entries(window.MODEL_DATA || {})) {
+        if (OBJ[name] || SYM[name]) continue;
+        try {
+          const bin = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0)).buffer;
+          const model = (await gltfLoader.parseAsync(bin, './')).scene;
+          model.traverse(o => { if (o.isMesh && !o.geometry.attributes.normal) o.geometry.computeVertexNormals(); });
+          model.updateMatrixWorld(true);
+          const box = new THREE.Box3().setFromObject(model), size = box.getSize(V()), mid = box.getCenter(V());
+          model.position.sub(V(mid.x, box.min.y, mid.z));
+          const inner = group(model); inner.scale.setScalar(1.8 / Math.max(size.x, size.y, size.z, 1e-6));
+          OBJ[name] = () => group(inner);
+        } catch (e) { console.warn(`model ${name}: ${e.message}`); }
+      }
       const KINDS = { ...OBJ, ...SYM };
 
       // ─── one story world: each object the script names gets one place, and the story comes back to it (the router

@@ -9,6 +9,7 @@ Run: `python -m agents.channel.main` (env CHANNEL_EN / CHANNEL_HE, default 3 / 1
 """
 from __future__ import annotations
 
+import base64
 import json
 import re
 import os
@@ -46,6 +47,7 @@ def make_video(topic: str, lang: str, palette: str, work: Path, hooks: list[str]
     shutil.copytree(ENGINE, work, dirs_exist_ok=True)
     segments = [{k: v for k, v in s.items() if k not in ("tone", "say")} for s in script["segments"]]
     (work / "video.js").write_text("window.VIDEO = " + json.dumps({"segments": segments, "lang": lang, "title": script["title"], "palette": palette, "bpm": beat.MOODS[script["mood"]]["bpm"]}, ensure_ascii=False) + ";\n", encoding="utf-8")
+    _pack_models(script["segments"], work)
     length = voice.narrate(script["segments"], work, lang)
     beat.main(work, script["mood"])
     env = {**os.environ, "SUB": "1", "SCALE": os.getenv("CHANNEL_SCALE", "1")}
@@ -55,6 +57,13 @@ def make_video(topic: str, lang: str, palette: str, work: Path, hooks: list[str]
                     "-preset", "medium", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(out)],
                    check=True, timeout=900)
     return {**script, "topic": topic, "file": out, "cover": make_cover(work), "seconds": round(length, 1)}
+
+
+def _pack_models(segments: list[dict[str, Any]], work: Path) -> None:
+    """The library models this script uses, base64 in models.js: the page runs from file://, where the GLTF loader can't fetch."""
+    names = {k for s in segments for k in (s.get("focus"), s.get("target")) if k and (ENGINE / "models" / f"{k}.glb").exists()}
+    data = {n: base64.b64encode((ENGINE / "models" / f"{n}.glb").read_bytes()).decode() for n in sorted(names)}
+    (work / "models.js").write_text("window.MODEL_DATA = " + json.dumps(data) + ";\n", encoding="utf-8")
 
 
 def make_cover(work: Path) -> Path | None:

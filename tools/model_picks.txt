@@ -1,0 +1,116 @@
+0 smartphone_white|phone,mobile,screen,app
+1 smartphone_black|phone,mobile,screen
+4 laptop_open|laptop,computer,screen
+5 pc_tower|computer,desktop,cpu
+6 monitor|screen,display,computer
+7 server_tower|server,data center,cloud,backend
+8 monitor_wide|screen,display,gaming
+10 keyboard|keyboard,typing,computer
+11 computer_mouse|mouse,click,computer
+16 headphones|headphones,sound,music,audio
+18 tv_retro|tv,old,broadcast
+19 tv_flat|tv,screen,streaming
+20 radio|radio,signal,broadcast,sound
+22 telescope|telescope,space,look,zoom
+23 helicopter|helicopter,flight,air
+25 robot_small|robot,ai,machine
+26 robot|robot,ai,machine,automation
+28 microphone|microphone,voice,record,podcast
+29 speaker_box|speaker,sound,audio
+31 speaker_big|speaker,sound,bass,music
+33 battery|battery,power,charge,energy
+38 power_pylon|electricity,grid,power line
+39 circuit_board|circuit,electronics,pcb,chip
+43 motherboard|motherboard,chip,electronics,computer
+44 ssd|storage,ssd,memory,data
+45 printer|printer,print,paper
+47 satellite_dish|dish,satellite,signal,receiver
+49 rocket|rocket,launch,space
+50 roof_antenna|antenna,signal,tv,radio
+51 antenna_mast|antenna,mast,signal,tower
+54 cell_tower|cell tower,signal,network,5g
+55 solar_panel|solar,energy,sun,power
+58 wind_turbine|wind,energy,turbine,power
+61 light_bulb|idea,light,bulb,electricity
+64 floor_lamp|lamp,light,home
+65 desk_lamp|lamp,light,desk,study
+67 sports_car|car,electric car,drive,speed
+69 traffic_light|traffic,road,signal,city
+73 graphics_card|gpu,graphics card,computer,gaming
+79 spaceship|spaceship,future,space
+81 police_car|police,car,emergency
+82 delivery_truck|delivery,truck,shipping
+83 pickup_truck|truck,car
+84 semi_truck|truck,logistics,shipping
+86 motorcycle|motorcycle,ride
+88 sail_ship|ship,sail,sea
+95 house|house,home
+96 cottage|house,home,old
+97 apartment_building|building,apartment,city
+98 city_building_color|building,city,street,shop
+100 skyscraper|skyscraper,city,office
+101 tower_building|building,tower,city
+102 glass_skyscraper|skyscraper,glass,office,company
+103 office_building|office,company,building
+104 factory|factory,industry,production
+105 corner_shop|shop,store,retail
+106 hospital_sign|hospital,health,medical
+116 bridge|bridge,connect,road
+117 city_building|building,city
+118 road|road,street,path
+120 gas_tank|gas,fuel,energy
+125 shipping_container|container,shipping,cargo,logistics
+126 crate|box,package,crate
+127 fridge|fridge,kitchen,cold
+129 drinks_fridge|fridge,drinks,store
+130 washing_machine|washing machine,laundry,home
+131 washer|washing machine,laundry
+135 microwave|microwave,kitchen,heat
+138 stove|stove,oven,cooking,kitchen
+140 ac_unit|air conditioner,cooling,heat
+142 ceiling_fan|fan,air,cooling
+143 desk_fan|fan,air,cooling
+144 fan|fan,air
+145 sofa|sofa,living room,home
+147 sofa_red|sofa,home
+149 bed|bed,sleep,night
+152 desk|desk,work,study
+155 office_chair|chair,office,work
+157 door|door,enter,home
+160 window|window,house
+163 alarm_clock|alarm,clock,time,morning
+166 coffee_machine|coffee,machine,morning
+167 toaster|toaster,kitchen
+170 dryer|dryer,laundry
+171 water_bottle|water,bottle,drink
+172 soda_can|soda,can,drink
+174 backpack|backpack,school,bag
+177 open_book|book,read,learn,school
+178 books|books,library,learn
+180 pizza_slice|pizza,food
+181 pizza|pizza,food
+182 pizza_box|pizza,delivery,box
+184 burger|burger,food,fast food
+187 coin|coin,money,price
+189 gold_bars|gold,money,value,rich
+190 money_bag|money,bag,profit
+192 milk_carton|milk,food,store
+194 gift|gift,present,free
+195 cardboard_box|box,package,delivery,order
+196 chest|chest,treasure,storage
+197 key|key,unlock,access,password
+200 padlock|lock,security,privacy,password
+202 safe|safe,security,bank
+208 heart|heart,like,love
+210 trees|trees,nature,park
+212 pine_tree|tree,nature
+215 mountain|mountain,nature
+216 cloud|cloud,weather,storage
+217 clouds|clouds,sky,weather
+222 saturn|planet,space,saturn
+223 planet|planet,space
+225 earth|earth,world,global,internet
+228 campfire|fire,heat,camp
+233 man|person,user,human
+235 human_figure|person,user,human,body
+236 astronaut|astronaut,space,person

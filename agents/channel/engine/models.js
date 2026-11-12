@@ -1,0 +1,1 @@
+window.MODEL_DATA = {};

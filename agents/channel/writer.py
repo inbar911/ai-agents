@@ -25,7 +25,10 @@ OBJECTS = ["phone", "laptop", "router", "earbuds", "watch", "tv", "server", "chi
            "lock", "charger", "controller", "car", "house"]
 SYMBOLS = ["wifi", "bluetooth", "signal", "pin", "battery", "bell", "heart", "check", "cross", "bolt", "eye", "chat", "play",
            "gear", "shield", "fingerprint", "sound", "camera_icon"]
-VISUALS = set(OBJECTS) | set(SYMBOLS)
+# the model library (engine/models): ~130 CC0 / NASA models, each with tags the writer picks from
+CATALOG = json.loads((Path(__file__).parent / "engine" / "models" / "catalog.json").read_text(encoding="utf-8"))
+LIBRARY = sorted(CATALOG)
+VISUALS = set(OBJECTS) | set(SYMBOLS) | set(LIBRARY)
 ACTIONS = {
     "show": "the camera just arrives at the object",
     "pulse": "the object throbs once (attention, 'this one')",
@@ -222,7 +225,8 @@ never on the hook or the last line.
 {HEBREW if lang == "he" else ENGLISH}
 Mark exactly ONE whole key word per line with *asterisks*. Facts must be correct.
 
-3D objects: {", ".join(OBJECTS)}
+3D objects (detailed, prefer these for devices): {", ".join(OBJECTS)}
+More 3D models, pick the one that shows the line exactly (name: what it is): {"; ".join(f"{n}: {', '.join(CATALOG[n]['tags'][:3])}" for n in LIBRARY)}
 3D symbols: {", ".join(SYMBOLS)}
 What can happen at a line's visual:
 {actions}

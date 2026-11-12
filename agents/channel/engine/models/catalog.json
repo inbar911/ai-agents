@@ -1,0 +1,1359 @@
+{
+ "smartphone_white": {
+  "tags": [
+   "phone",
+   "mobile",
+   "screen",
+   "app"
+  ],
+  "title": "Phone",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/k2kgBepoMU"
+ },
+ "smartphone_black": {
+  "tags": [
+   "phone",
+   "mobile",
+   "screen"
+  ],
+  "title": "Smartphone",
+  "by": "smallbigsquare",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/4DRZmTs3jq"
+ },
+ "laptop_open": {
+  "tags": [
+   "laptop",
+   "computer",
+   "screen"
+  ],
+  "title": "Laptop",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/GnbwSUiVty"
+ },
+ "pc_tower": {
+  "tags": [
+   "computer",
+   "desktop",
+   "cpu"
+  ],
+  "title": "Computer",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/7KNoiQlSxi"
+ },
+ "monitor": {
+  "tags": [
+   "screen",
+   "display",
+   "computer"
+  ],
+  "title": "Computer Screen",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/V5Qo141OcB"
+ },
+ "server_tower": {
+  "tags": [
+   "server",
+   "data center",
+   "cloud",
+   "backend"
+  ],
+  "title": "Computer Large",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/or4LLmesjq"
+ },
+ "monitor_wide": {
+  "tags": [
+   "screen",
+   "display",
+   "gaming"
+  ],
+  "title": "Monitor",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/PvSjEbz11k"
+ },
+ "keyboard": {
+  "tags": [
+   "keyboard",
+   "typing",
+   "computer"
+  ],
+  "title": "Computer Keyboard",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/vsqTUPFSw6"
+ },
+ "computer_mouse": {
+  "tags": [
+   "mouse",
+   "click",
+   "computer"
+  ],
+  "title": "Computer Mouse",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/V2Ebx3pvo4"
+ },
+ "headphones": {
+  "tags": [
+   "headphones",
+   "sound",
+   "music",
+   "audio"
+  ],
+  "title": "Headphones",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/PSsWSIAYIL"
+ },
+ "tv_retro": {
+  "tags": [
+   "tv",
+   "old",
+   "broadcast"
+  ],
+  "title": "Television Vintage",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/aSmz6H8aeu"
+ },
+ "tv_flat": {
+  "tags": [
+   "tv",
+   "screen",
+   "streaming"
+  ],
+  "title": "Television",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/9trLeWoBek"
+ },
+ "radio": {
+  "tags": [
+   "radio",
+   "signal",
+   "broadcast",
+   "sound"
+  ],
+  "title": "Radio",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/TPqvwkyWdV"
+ },
+ "telescope": {
+  "tags": [
+   "telescope",
+   "space",
+   "look",
+   "zoom"
+  ],
+  "title": "Telescope",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/RjyTCQvA8b"
+ },
+ "helicopter": {
+  "tags": [
+   "helicopter",
+   "flight",
+   "air"
+  ],
+  "title": "Helicopter",
+  "by": "kazuma",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/EQJ2MECUbx"
+ },
+ "robot_small": {
+  "tags": [
+   "robot",
+   "ai",
+   "machine"
+  ],
+  "title": "Animated Robot",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/QCm7qe9uNJ"
+ },
+ "robot": {
+  "tags": [
+   "robot",
+   "ai",
+   "machine",
+   "automation"
+  ],
+  "title": "Robot",
+  "by": "Polygonal Mind",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/ejDr8lRglP"
+ },
+ "microphone": {
+  "tags": [
+   "microphone",
+   "voice",
+   "record",
+   "podcast"
+  ],
+  "title": "Mic",
+  "by": "iPoly3D",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/yqbacXdPsg"
+ },
+ "speaker_box": {
+  "tags": [
+   "speaker",
+   "sound",
+   "audio"
+  ],
+  "title": "Speaker Small",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/YaVrUj51TV"
+ },
+ "speaker_big": {
+  "tags": [
+   "speaker",
+   "sound",
+   "bass",
+   "music"
+  ],
+  "title": "Speaker",
+  "by": "iPoly3D",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/zOQOThSpuo"
+ },
+ "battery": {
+  "tags": [
+   "battery",
+   "power",
+   "charge",
+   "energy"
+  ],
+  "title": "Battery",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/MYa3uWdwPU"
+ },
+ "power_pylon": {
+  "tags": [
+   "electricity",
+   "grid",
+   "power line"
+  ],
+  "title": "Transmission Tower",
+  "by": "iPoly3D",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/Xfb0lAPvnh"
+ },
+ "circuit_board": {
+  "tags": [
+   "circuit",
+   "electronics",
+   "pcb",
+   "chip"
+  ],
+  "title": "Electronics Collectable",
+  "by": "iPoly3D",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/qqRVRerNSu"
+ },
+ "motherboard": {
+  "tags": [
+   "motherboard",
+   "chip",
+   "electronics",
+   "computer"
+  ],
+  "title": "Electronics Board",
+  "by": "iPoly3D",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/mKoBjuxV4R"
+ },
+ "ssd": {
+  "tags": [
+   "storage",
+   "ssd",
+   "memory",
+   "data"
+  ],
+  "title": "SSD",
+  "by": "iPoly3D",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/sax4h1Dx9z"
+ },
+ "printer": {
+  "tags": [
+   "printer",
+   "print",
+   "paper"
+  ],
+  "title": "Printer",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/77K2TCL5Lz"
+ },
+ "satellite_dish": {
+  "tags": [
+   "dish",
+   "satellite",
+   "signal",
+   "receiver"
+  ],
+  "title": "Antenna",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/OuHQCigiUR"
+ },
+ "rocket": {
+  "tags": [
+   "rocket",
+   "launch",
+   "space"
+  ],
+  "title": "Rocket",
+  "by": "hat_my_guy",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/9awwTQWYux"
+ },
+ "roof_antenna": {
+  "tags": [
+   "antenna",
+   "signal",
+   "tv",
+   "radio"
+  ],
+  "title": "Roof Antenna",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/Fbdg52kqJ6"
+ },
+ "antenna_mast": {
+  "tags": [
+   "antenna",
+   "mast",
+   "signal",
+   "tower"
+  ],
+  "title": "Antenna",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/l5Oc9swvKk"
+ },
+ "cell_tower": {
+  "tags": [
+   "cell tower",
+   "signal",
+   "network",
+   "5g"
+  ],
+  "title": "TV Tower",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/R8DtfW6Nx5"
+ },
+ "solar_panel": {
+  "tags": [
+   "solar",
+   "energy",
+   "sun",
+   "power"
+  ],
+  "title": "Solar Panel",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/ah89Y79JdT"
+ },
+ "wind_turbine": {
+  "tags": [
+   "wind",
+   "energy",
+   "turbine",
+   "power"
+  ],
+  "title": "Turbine",
+  "by": "Kay Lousberg",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/79RIeBw3Wk"
+ },
+ "light_bulb": {
+  "tags": [
+   "idea",
+   "light",
+   "bulb",
+   "electricity"
+  ],
+  "title": "Light bulb",
+  "by": "reelpersen",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/kDo0SbQW9Y"
+ },
+ "floor_lamp": {
+  "tags": [
+   "lamp",
+   "light",
+   "home"
+  ],
+  "title": "Light Stand",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/9L6lLUl9sD"
+ },
+ "desk_lamp": {
+  "tags": [
+   "lamp",
+   "light",
+   "desk",
+   "study"
+  ],
+  "title": "Light Desk",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/uJDWrSJGVH"
+ },
+ "sports_car": {
+  "tags": [
+   "car",
+   "electric car",
+   "drive",
+   "speed"
+  ],
+  "title": "Sports Car",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/1mkmFkAz5v"
+ },
+ "traffic_light": {
+  "tags": [
+   "traffic",
+   "road",
+   "signal",
+   "city"
+  ],
+  "title": "Traffic light",
+  "by": "Kay Lousberg",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/aYC3t5ymln"
+ },
+ "graphics_card": {
+  "tags": [
+   "gpu",
+   "graphics card",
+   "computer",
+   "gaming"
+  ],
+  "title": "Pci E Card",
+  "by": "iPoly3D",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/lHRTD47DCP"
+ },
+ "spaceship": {
+  "tags": [
+   "spaceship",
+   "future",
+   "space"
+  ],
+  "title": "Spaceship",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/htfBk9vPfw"
+ },
+ "police_car": {
+  "tags": [
+   "police",
+   "car",
+   "emergency"
+  ],
+  "title": "Police Car",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/BwwnUrWGmV"
+ },
+ "delivery_truck": {
+  "tags": [
+   "delivery",
+   "truck",
+   "shipping"
+  ],
+  "title": "Truck",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/cXw6oiFtZ8"
+ },
+ "pickup_truck": {
+  "tags": [
+   "truck",
+   "car"
+  ],
+  "title": "Pickup Truck",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/qn4grQgHm8"
+ },
+ "semi_truck": {
+  "tags": [
+   "truck",
+   "logistics",
+   "shipping"
+  ],
+  "title": "Basic Semi-truck with spikes",
+  "by": "WilliWam",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/kGA4N3G7Jv"
+ },
+ "motorcycle": {
+  "tags": [
+   "motorcycle",
+   "ride"
+  ],
+  "title": "Cartoony Purple Motorcycle",
+  "by": "AliceCassie",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/j20srJUjpB"
+ },
+ "sail_ship": {
+  "tags": [
+   "ship",
+   "sail",
+   "sea"
+  ],
+  "title": "Sail Ship",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/cIzO4MBPqI"
+ },
+ "house": {
+  "tags": [
+   "house",
+   "home"
+  ],
+  "title": "House",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/roqiHdrpgc"
+ },
+ "cottage": {
+  "tags": [
+   "house",
+   "home",
+   "old"
+  ],
+  "title": "Cottage",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/YDGLLT0emC"
+ },
+ "apartment_building": {
+  "tags": [
+   "building",
+   "apartment",
+   "city"
+  ],
+  "title": "Large Building",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/ppwtREejXg"
+ },
+ "city_building_color": {
+  "tags": [
+   "building",
+   "city",
+   "street",
+   "shop"
+  ],
+  "title": "Building",
+  "by": "Kay Lousberg",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/T3oyvK6VEU"
+ },
+ "skyscraper": {
+  "tags": [
+   "skyscraper",
+   "city",
+   "office"
+  ],
+  "title": "Skyscraper",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/XST1j6kYsL"
+ },
+ "tower_building": {
+  "tags": [
+   "building",
+   "tower",
+   "city"
+  ],
+  "title": "Skyscraper",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/obYD8hWLTZ"
+ },
+ "glass_skyscraper": {
+  "tags": [
+   "skyscraper",
+   "glass",
+   "office",
+   "company"
+  ],
+  "title": "Skyscraper",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/PsPe0MzK0E"
+ },
+ "office_building": {
+  "tags": [
+   "office",
+   "company",
+   "building"
+  ],
+  "title": "Large Building",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/sxXonOmtct"
+ },
+ "factory": {
+  "tags": [
+   "factory",
+   "industry",
+   "production"
+  ],
+  "title": "Structure",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/ilWoURnbZW"
+ },
+ "corner_shop": {
+  "tags": [
+   "shop",
+   "store",
+   "retail"
+  ],
+  "title": "Building",
+  "by": "Kay Lousberg",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/EL3ePInr1N"
+ },
+ "hospital_sign": {
+  "tags": [
+   "hospital",
+   "health",
+   "medical"
+  ],
+  "title": "Sign Hospital",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/PeM20xAT0V"
+ },
+ "bridge": {
+  "tags": [
+   "bridge",
+   "connect",
+   "road"
+  ],
+  "title": "Bridge",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/orI7eNSB38"
+ },
+ "city_building": {
+  "tags": [
+   "building",
+   "city"
+  ],
+  "title": "Building",
+  "by": "Kay Lousberg",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/bbH2Bg73qM"
+ },
+ "road": {
+  "tags": [
+   "road",
+   "street",
+   "path"
+  ],
+  "title": "Street Straight",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/UA4axT3nIQ"
+ },
+ "gas_tank": {
+  "tags": [
+   "gas",
+   "fuel",
+   "energy"
+  ],
+  "title": "Gas Tank",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/RoCvKBGkoC"
+ },
+ "shipping_container": {
+  "tags": [
+   "container",
+   "shipping",
+   "cargo",
+   "logistics"
+  ],
+  "title": "Container Red",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/vzzCNUB6Zn"
+ },
+ "crate": {
+  "tags": [
+   "box",
+   "package",
+   "crate"
+  ],
+  "title": "Crate",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/3OEFd1AWfa"
+ },
+ "fridge": {
+  "tags": [
+   "fridge",
+   "kitchen",
+   "cold"
+  ],
+  "title": "Kitchen Fridge",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/8sjRm8fnHh"
+ },
+ "drinks_fridge": {
+  "tags": [
+   "fridge",
+   "drinks",
+   "store"
+  ],
+  "title": "Can Fridge",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/8OHbykvREu"
+ },
+ "washing_machine": {
+  "tags": [
+   "washing machine",
+   "laundry",
+   "home"
+  ],
+  "title": "Washing Machine",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/UFxsKNSl8W"
+ },
+ "washer": {
+  "tags": [
+   "washing machine",
+   "laundry"
+  ],
+  "title": "Washer",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/C7HZypH3D6"
+ },
+ "microwave": {
+  "tags": [
+   "microwave",
+   "kitchen",
+   "heat"
+  ],
+  "title": "Kitchen Microwave",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/vUsvf2HGDv"
+ },
+ "stove": {
+  "tags": [
+   "stove",
+   "oven",
+   "cooking",
+   "kitchen"
+  ],
+  "title": "Stove Oven",
+  "by": "MilkAndBanana",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/uBzXbRF6LQ"
+ },
+ "ac_unit": {
+  "tags": [
+   "air conditioner",
+   "cooling",
+   "heat"
+  ],
+  "title": "Air Conditioner",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/amFuyE3IF6"
+ },
+ "ceiling_fan": {
+  "tags": [
+   "fan",
+   "air",
+   "cooling"
+  ],
+  "title": "Ceiling Fan",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/pRMxaQQXha"
+ },
+ "desk_fan": {
+  "tags": [
+   "fan",
+   "air",
+   "cooling"
+  ],
+  "title": "Desk Fan",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/OlTLyyXoXY"
+ },
+ "fan": {
+  "tags": [
+   "fan",
+   "air"
+  ],
+  "title": "Fan",
+  "by": "kazuma",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/QdOxYDGjhN"
+ },
+ "sofa": {
+  "tags": [
+   "sofa",
+   "living room",
+   "home"
+  ],
+  "title": "Sofa",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/X5kQPKzAWp"
+ },
+ "sofa_red": {
+  "tags": [
+   "sofa",
+   "home"
+  ],
+  "title": "Lounge Sofa",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/jMu2iCmGxU"
+ },
+ "bed": {
+  "tags": [
+   "bed",
+   "sleep",
+   "night"
+  ],
+  "title": "Bed",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/rXo5Rkl5LC"
+ },
+ "desk": {
+  "tags": [
+   "desk",
+   "work",
+   "study"
+  ],
+  "title": "Desk",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/YJyJam67hJ"
+ },
+ "office_chair": {
+  "tags": [
+   "chair",
+   "office",
+   "work"
+  ],
+  "title": "Office Chair",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/UfKvrZBK6C"
+ },
+ "door": {
+  "tags": [
+   "door",
+   "enter",
+   "home"
+  ],
+  "title": "Door",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/a948jjnuaL"
+ },
+ "window": {
+  "tags": [
+   "window",
+   "house"
+  ],
+  "title": "Window Small",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/n88WAcjzTv"
+ },
+ "alarm_clock": {
+  "tags": [
+   "alarm",
+   "clock",
+   "time",
+   "morning"
+  ],
+  "title": "Alarm Clock",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/y5f363OS9C"
+ },
+ "coffee_machine": {
+  "tags": [
+   "coffee",
+   "machine",
+   "morning"
+  ],
+  "title": "Kitchen Coffee Machine",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/jBUiOz36vs"
+ },
+ "toaster": {
+  "tags": [
+   "toaster",
+   "kitchen"
+  ],
+  "title": "Toaster",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/wALulTo6gm"
+ },
+ "dryer": {
+  "tags": [
+   "dryer",
+   "laundry"
+  ],
+  "title": "Dryer",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/VHaBW6HLMI"
+ },
+ "water_bottle": {
+  "tags": [
+   "water",
+   "bottle",
+   "drink"
+  ],
+  "title": "Water Bottle",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/KpxDpidn1Z"
+ },
+ "soda_can": {
+  "tags": [
+   "soda",
+   "can",
+   "drink"
+  ],
+  "title": "Soda Can",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/KOLcdOATw6"
+ },
+ "backpack": {
+  "tags": [
+   "backpack",
+   "school",
+   "bag"
+  ],
+  "title": "Backpack",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/vF7TuXCPDH"
+ },
+ "open_book": {
+  "tags": [
+   "book",
+   "read",
+   "learn",
+   "school"
+  ],
+  "title": "Open Book",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/FsCIGEfTEs"
+ },
+ "books": {
+  "tags": [
+   "books",
+   "library",
+   "learn"
+  ],
+  "title": "Books",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/dxt7dETAy9"
+ },
+ "pizza_slice": {
+  "tags": [
+   "pizza",
+   "food"
+  ],
+  "title": "Pizza Slice",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/CA4HtaaMJn"
+ },
+ "pizza": {
+  "tags": [
+   "pizza",
+   "food"
+  ],
+  "title": "Pizza",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/XmmG0uImLL"
+ },
+ "pizza_box": {
+  "tags": [
+   "pizza",
+   "delivery",
+   "box"
+  ],
+  "title": "Pizza Box",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/PSqXX0pj5o"
+ },
+ "burger": {
+  "tags": [
+   "burger",
+   "food",
+   "fast food"
+  ],
+  "title": "Hamburger",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/CI3WufjOIN"
+ },
+ "coin": {
+  "tags": [
+   "coin",
+   "money",
+   "price"
+  ],
+  "title": "Coin",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/7IrL01B97W"
+ },
+ "gold_bars": {
+  "tags": [
+   "gold",
+   "money",
+   "value",
+   "rich"
+  ],
+  "title": "Gold Bars",
+  "by": "hat_my_guy",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/O8IbRMytLf"
+ },
+ "money_bag": {
+  "tags": [
+   "money",
+   "bag",
+   "profit"
+  ],
+  "title": "Gold Bag",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/vFFblhnHtb"
+ },
+ "milk_carton": {
+  "tags": [
+   "milk",
+   "food",
+   "store"
+  ],
+  "title": "Carton",
+  "by": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/T2QjC2ZQya"
+ },
+ "gift": {
+  "tags": [
+   "gift",
+   "present",
+   "free"
+  ],
+  "title": "Present",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/LVg3ynJDxa"
+ },
+ "cardboard_box": {
+  "tags": [
+   "box",
+   "package",
+   "delivery",
+   "order"
+  ],
+  "title": "Empty Box",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/pZBpmjtvw8"
+ },
+ "chest": {
+  "tags": [
+   "chest",
+   "treasure",
+   "storage"
+  ],
+  "title": "Chest",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/O72u4Drp8k"
+ },
+ "key": {
+  "tags": [
+   "key",
+   "unlock",
+   "access",
+   "password"
+  ],
+  "title": "Key",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/bg6e1lfNsO"
+ },
+ "padlock": {
+  "tags": [
+   "lock",
+   "security",
+   "privacy",
+   "password"
+  ],
+  "title": "Padlock",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/2ZSHgKVr3F"
+ },
+ "safe": {
+  "tags": [
+   "safe",
+   "security",
+   "bank"
+  ],
+  "title": "Safe",
+  "by": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/N4egHD2Vms"
+ },
+ "heart": {
+  "tags": [
+   "heart",
+   "like",
+   "love"
+  ],
+  "title": "Heart",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/1yCRUwFnwX"
+ },
+ "trees": {
+  "tags": [
+   "trees",
+   "nature",
+   "park"
+  ],
+  "title": "Trees",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/etFGNvsiFv"
+ },
+ "pine_tree": {
+  "tags": [
+   "tree",
+   "nature"
+  ],
+  "title": "Pine",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/79gmlLnweB"
+ },
+ "mountain": {
+  "tags": [
+   "mountain",
+   "nature"
+  ],
+  "title": "Mountain",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/7HYR2s9JVi"
+ },
+ "cloud": {
+  "tags": [
+   "cloud",
+   "weather",
+   "storage"
+  ],
+  "title": "Cloud",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/KdFNOVn1Gf"
+ },
+ "clouds": {
+  "tags": [
+   "clouds",
+   "sky",
+   "weather"
+  ],
+  "title": "Clouds",
+  "by": "hat_my_guy",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/gEm9CjnS9l"
+ },
+ "saturn": {
+  "tags": [
+   "planet",
+   "space",
+   "saturn"
+  ],
+  "title": "Planet",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/9g1aIbfR9Y"
+ },
+ "planet": {
+  "tags": [
+   "planet",
+   "space"
+  ],
+  "title": "Planet",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/IVnmauIgWX"
+ },
+ "earth": {
+  "tags": [
+   "earth",
+   "world",
+   "global",
+   "internet"
+  ],
+  "title": "Planet",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/B7xd3SZq0z"
+ },
+ "campfire": {
+  "tags": [
+   "fire",
+   "heat",
+   "camp"
+  ],
+  "title": "Bonfire",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/k1e0cOzi8A"
+ },
+ "man": {
+  "tags": [
+   "person",
+   "user",
+   "human"
+  ],
+  "title": "Man",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/HMnuH5geEG"
+ },
+ "human_figure": {
+  "tags": [
+   "person",
+   "user",
+   "human",
+   "body"
+  ],
+  "title": "Animated Human",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/c3Ibh9I3udk"
+ },
+ "astronaut": {
+  "tags": [
+   "astronaut",
+   "space",
+   "person"
+  ],
+  "title": "Astronaut",
+  "by": "Quaternius",
+  "licence": "CC0 1.0",
+  "source": "https://poly.pizza/m/3hC2i0CTuO"
+ },
+ "space_station": {
+  "tags": [
+   "space station",
+   "iss",
+   "orbit",
+   "astronaut"
+  ],
+  "title": "International Space Station (ISS) (A)",
+  "by": "NASA",
+  "licence": "NASA media usage guidelines: free to use, no NASA endorsement or insignia",
+  "source": "https://github.com/nasa/NASA-3D-Resources"
+ },
+ "hubble": {
+  "tags": [
+   "telescope",
+   "space",
+   "photo",
+   "orbit"
+  ],
+  "title": "Hubble Space Telescope (A)",
+  "by": "NASA",
+  "licence": "NASA media usage guidelines: free to use, no NASA endorsement or insignia",
+  "source": "https://github.com/nasa/NASA-3D-Resources"
+ },
+ "deep_space_dish": {
+  "tags": [
+   "dish",
+   "antenna",
+   "signal",
+   "space",
+   "radio"
+  ],
+  "title": "Deep Space Network 70-meter",
+  "by": "NASA",
+  "licence": "NASA media usage guidelines: free to use, no NASA endorsement or insignia",
+  "source": "https://github.com/nasa/NASA-3D-Resources"
+ },
+ "webb_telescope": {
+  "tags": [
+   "telescope",
+   "space",
+   "infrared"
+  ],
+  "title": "James Webb Space Telescope (A)",
+  "by": "NASA",
+  "licence": "NASA media usage guidelines: free to use, no NASA endorsement or insignia",
+  "source": "https://github.com/nasa/NASA-3D-Resources"
+ },
+ "comm_satellite": {
+  "tags": [
+   "satellite",
+   "communication",
+   "relay",
+   "signal",
+   "gps"
+  ],
+  "title": "Tracking and Data Relay Satellites (TDRS) (A)",
+  "by": "NASA",
+  "licence": "NASA media usage guidelines: free to use, no NASA endorsement or insignia",
+  "source": "https://github.com/nasa/NASA-3D-Resources"
+ }
+}
