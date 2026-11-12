@@ -28,7 +28,7 @@ from lib.memory import remember
 from lib.supabase_client import log_run, sb
 
 ENGINE = Path(__file__).parent / "engine"
-PALETTES = ["indigo", "teal", "violet"]   # PALETTES in engine/world.js; videos take turns
+PALETTES = ["grouper"]   # PALETTES in engine/world.js; the Grouper look (one indigo family, dark glass) since 12.11
 BUCKET = "channel-videos"
 # The day's videos per channel. Hebrew (one video) goes first so a slow English render can't push it past the job timeout.
 PLAN = [("he", int(os.getenv("CHANNEL_HE", "1"))), ("en", int(os.getenv("CHANNEL_EN", "3")))]
@@ -46,8 +46,8 @@ def make_video(topic: str, lang: str, palette: str, work: Path, hooks: list[str]
     script = writer.write_script(topic, lang, hooks, notes)
     shutil.copytree(ENGINE, work, dirs_exist_ok=True)
     segments = [{k: v for k, v in s.items() if k not in ("tone", "say")} for s in script["segments"]]
-    (work / "video.js").write_text("window.VIDEO = " + json.dumps({"segments": segments, "lang": lang, "title": script["title"], "palette": palette, "bpm": beat.MOODS[script["mood"]]["bpm"]}, ensure_ascii=False) + ";\n", encoding="utf-8")
-    _pack_models(script["segments"], work)
+    (work / "video.js").write_text("window.VIDEO = " + json.dumps({"segments": segments, "lang": lang, "title": script["title"], "palette": palette, "env": script.get("env", "studio"), "envModels": ENV_MODELS.get(script.get("env", "studio"), []), "bpm": beat.MOODS[script["mood"]]["bpm"]}, ensure_ascii=False) + ";\n", encoding="utf-8")
+    _pack_models(script["segments"], work, script.get("env", "studio"))
     length = voice.narrate(script["segments"], work, lang)
     beat.main(work, script["mood"])
     env = {**os.environ, "SUB": "1", "SCALE": os.getenv("CHANNEL_SCALE", "1")}
@@ -59,9 +59,20 @@ def make_video(topic: str, lang: str, palette: str, work: Path, hooks: list[str]
     return {**script, "topic": topic, "file": out, "cover": make_cover(work), "seconds": round(length, 1)}
 
 
-def _pack_models(segments: list[dict[str, Any]], work: Path) -> None:
-    """The library models this script uses, base64 in models.js: the page runs from file://, where the GLTF loader can't fetch."""
+# the set dressing of each world (engine/world.js ENV): buildings and cars on a street, furniture in a room, planets in orbit
+ENV_MODELS = {
+    "city": ["city_building", "apartment_building", "skyscraper", "glass_skyscraper", "office_building", "tower_building", "city_building_color",
+             "sports_car", "police_car", "delivery_truck", "traffic_light"],
+    "home": ["sofa", "fridge", "floor_lamp", "desk", "bed", "tv_flat", "washing_machine", "office_chair", "window", "door"],
+    "space": ["earth", "saturn", "planet", "comm_satellite"],
+    "studio": [],
+}
+
+
+def _pack_models(segments: list[dict[str, Any]], work: Path, env: str = "studio") -> None:
+    """The library models this script and its world use, base64 in models.js: the page runs from file://, where the GLTF loader can't fetch."""
     names = {k for s in segments for k in (s.get("focus"), s.get("target")) if k and (ENGINE / "models" / f"{k}.glb").exists()}
+    names |= {n for n in ENV_MODELS.get(env, []) if (ENGINE / "models" / f"{n}.glb").exists()}
     data = {n: base64.b64encode((ENGINE / "models" / f"{n}.glb").read_bytes()).decode() for n in sorted(names)}
     (work / "models.js").write_text("window.MODEL_DATA = " + json.dumps(data) + ";\n", encoding="utf-8")
 

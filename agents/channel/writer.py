@@ -29,6 +29,7 @@ SYMBOLS = ["wifi", "bluetooth", "signal", "pin", "battery", "bell", "heart", "ch
 CATALOG = json.loads((Path(__file__).parent / "engine" / "models" / "catalog.json").read_text(encoding="utf-8"))
 LIBRARY = sorted(CATALOG)
 VISUALS = set(OBJECTS) | set(SYMBOLS) | set(LIBRARY)
+ENVS = {"city", "home", "space", "studio"}   # ENV in engine/world.js
 ACTIONS = {
     "show": "the camera just arrives at the object",
     "pulse": "the object throbs once (attention, 'this one')",
@@ -240,6 +241,7 @@ Return JSON only:
   "hashtags": ["#...", 3-5 specific topic hashtags; never #viral #fyp #explorepage #foryou],
   "hook_options": ["<another hook, different formula>", "<another hook, different formula>"],
   "mood": "<background beat that fits the topic: pop | lofi | electro | chill | trap>",
+  "env": "<the world the story happens in: city (streets, buildings, cars: networks, phones on the move, GPS, deliveries) | home (a room: appliances, furniture, things at home) | space (stars and orbit: satellites, GPS, the internet around the planet) | studio (a plain dark stage, when none fits)>",
   "segments": [{{"text": "<line>", "tone": "<English voice direction: energetic, amazed, playful, dramatic...>",{SAY if lang == "he" else ""}
                  "focus": "<object (or a symbol when no object fits)>", "symbol": "<symbol shown over it, optional>", "action": "<action>", "target": "<object, only for beam>",
                  "label": "<optional 1-2 words floating over it>", "value": <number, only for count>,
@@ -319,4 +321,5 @@ def _valid_script(s: Any, lang: str = "he") -> dict[str, Any]:
         "hashtags": [h for h in s.get("hashtags", []) if isinstance(h, str) and h.startswith("#") and h.lower() not in dead][:5],
         "segments": segs,
         "mood": s.get("mood") if s.get("mood") in MOODS else "electro",
+        "env": s.get("env") if s.get("env") in ENVS else "studio",
     }

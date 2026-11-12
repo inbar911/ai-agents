@@ -8,12 +8,15 @@
   'use strict';
   // dark neon studio (the look Inbar liked): sky gradient, floor/grid colour, and the accents objects take in turn
   const PALETTES = {
+    // Grouper look (12.11): ONE hue family, indigo to lavender, on deep navy; red only for the key word in captions
+    grouper: { top: '#0d0b33', bottom: '#04031a', grid: 0x2c2a78, accent: ['#9a96ff', '#b3adff', '#8582f2', '#a7a1ff', '#9590ff'], hot: '#FF3B5C', glass: true },
     indigo: { top: '#140c45', bottom: '#04030f', grid: 0x3d5bff, accent: ['#5ad8ff', '#ff5ccf', '#9d8bff', '#4dffb0', '#ffb347'], hot: '#FF3B5C' },
     teal:   { top: '#062e3a', bottom: '#02090d', grid: 0x26e0b0, accent: ['#4fe0ef', '#ff6fae', '#ffd166', '#8c9bff', '#6dffb3'], hot: '#FF3B5C' },
     violet: { top: '#2a0b4a', bottom: '#07020d', grid: 0xb15cff, accent: ['#d27dff', '#5ad8ff', '#ff8a5c', '#ffe066', '#6dffb3'], hot: '#FF3B5C' },
   };
-  const PAL = PALETTES[VIDEO.palette] || PALETTES.indigo;
-  const DIR = VIDEO.lang === 'en' ? 'ltr' : 'rtl';   // English videos read left to right
+  const PAL = PALETTES[VIDEO.palette] || PALETTES.grouper;
+  const DIR = VIDEO.lang === 'en' ? 'ltr' : 'rtl';
+  const ENV = ['city', 'home', 'space', 'studio'].includes(VIDEO.env) ? VIDEO.env : 'studio';   // the world (writer.py ENVS)   // English videos read left to right
   const SEGS = VIDEO.segments.map((s, i) => Object.assign({}, s, TIMING[i], { i, end: i + 1 < TIMING.length ? TIMING[i + 1].a : DUR }));
 
   scene('main', 0, DUR, { bg: PAL.bottom }, (root) => {
@@ -46,7 +49,7 @@
       for (let k = -40; k <= 40; k += 2) gridPts.push(k, 0, 20, k, 0, -SEGS.length * 4.2 - 40);
       for (let z = 20; z >= -SEGS.length * 4.2 - 40; z -= 2) gridPts.push(-40, 0, z, 40, 0, z);
       const gridGeo = new THREE.BufferGeometry(); gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(gridPts, 3));
-      world.add(new THREE.LineSegments(gridGeo, new THREE.LineBasicMaterial(Object.assign({ color: PAL.grid, opacity: 0.22 }, ADD))));
+      const floorGrid = new THREE.LineSegments(gridGeo, new THREE.LineBasicMaterial(Object.assign({ color: PAL.grid, opacity: 0.22 }, ADD))); world.add(floorGrid);
 
       // ─── materials ───
       const M = {
@@ -71,6 +74,11 @@
       const group = (...parts) => { const g = new THREE.Group(); parts.forEach(p => g.add(p)); return g; };
       const plane = (w, h, mat, at, rot) => mesh(new THREE.PlaneGeometry(w, h), mat, at, rot);
 
+      const GLASS = (c) => new THREE.ShaderMaterial({
+        uniforms: { c: { value: new THREE.Color(c) }, body: { value: new THREE.Color('#0c0a2a') } }, side: THREE.DoubleSide, transparent: true, depthWrite: false,
+        vertexShader: 'varying vec3 n; varying vec3 v; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); n = normalize(normalMatrix * normal); v = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+        fragmentShader: 'uniform vec3 c; uniform vec3 body; varying vec3 n; varying vec3 v; void main(){ float r = pow(1.0 - abs(dot(normalize(n), normalize(v))), 2.5); vec3 col = mix(body, c * 0.55, r); gl_FragColor = vec4(col, 0.42 + 0.33 * r); }',
+      });
       const RIM = (c) => new THREE.ShaderMaterial({
         uniforms: { c: { value: new THREE.Color(c) } }, side: THREE.DoubleSide, ...ADD,
         vertexShader: 'varying vec3 n; varying vec3 v; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); n = normalize(normalMatrix * normal); v = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
@@ -80,8 +88,10 @@
         // additive glow stacks up: a dense model with many overlapping parts (a NASA rover) burns out to white, so dim it
         let tris = 0; root.traverse(o => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
         const col = new THREE.Color(c).multiplyScalar(tris > 30000 ? Math.max(0.3, Math.sqrt(30000 / tris)) : 1), white = new THREE.Color(0xffffff);
-        const edge = new THREE.LineBasicMaterial(Object.assign({ color: col.clone().lerp(white, 0.35), opacity: 0.95 }, ADD)), rim = RIM(c);
-        const edgeLight = new THREE.LineBasicMaterial(Object.assign({ color: col.clone().lerp(white, 0.55), opacity: 0.9 }, ADD)), rimLight = RIM(col.clone().lerp(white, 0.3));
+        const edge = PAL.glass ? new THREE.LineBasicMaterial({ color: col.clone().lerp(white, 0.55), transparent: true, opacity: 0.7, depthWrite: false })
+          : new THREE.LineBasicMaterial(Object.assign({ color: col.clone().lerp(white, 0.35), opacity: 0.95 }, ADD)), rim = PAL.glass ? GLASS(col) : RIM(c);
+        const edgeLight = PAL.glass ? new THREE.LineBasicMaterial({ color: white, transparent: true, opacity: 0.85, depthWrite: false })
+          : new THREE.LineBasicMaterial(Object.assign({ color: col.clone().lerp(white, 0.55), opacity: 0.9 }, ADD)), rimLight = PAL.glass ? GLASS(col.clone().lerp(white, 0.4)) : RIM(col.clone().lerp(white, 0.3));
         const meshes = []; root.traverse(o => { if (o.isMesh) meshes.push(o); });
         for (const m of meshes) {
           m.castShadow = m.receiveShadow = false;
@@ -91,7 +101,7 @@
           m.material = light ? rimLight : rim;
           // glowing edges, except on very dense meshes (big NASA models): there they'd be a solid blur and cost render time
           const tris = (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3;
-          if (tris < 40000) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 15), light ? edgeLight : edge));
+          if (tris < 40000) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, PAL.glass ? 25 : 15), light ? edgeLight : edge));
         }
       }
 
@@ -252,14 +262,14 @@
           const box = new THREE.Box3().setFromObject(model), size = box.getSize(V()), mid = box.getCenter(V());
           model.position.sub(V(mid.x, box.min.y, mid.z));
           const inner = group(model); inner.scale.setScalar(1.8 / Math.max(size.x, size.y, size.z, 1e-6));
-          OBJ[name] = () => group(inner);
+          OBJ[name] = () => group(inner.clone(true));   // a clone per use: the world can dress a street with the same building twice
         } catch (e) { console.warn(`model ${name}: ${e.message}`); }
       }
       const KINDS = { ...OBJ, ...SYM };
 
       // ─── one story world: each object the script names gets one place, and the story comes back to it (the router
       // stays the router, the phone stays the phone), so things can talk to each other across the scene ───
-      const RING = (c) => new THREE.MeshBasicMaterial(Object.assign({ color: new THREE.Color(c) }, ADD));
+      const RING = (c) => new THREE.MeshBasicMaterial(Object.assign({ color: new THREE.Color(c).multiplyScalar(PAL.glass ? 0.35 : 1) }, ADD));   // Grouper has no pedestals: just a faint floor ring
       const kindOf = k => (KINDS[k] ? k : 'phone');
       const kinds = [];
       for (const s of SEGS) for (const k of [s.focus, s.target]) if (k && !kinds.includes(kindOf(k))) kinds.push(kindOf(k));
@@ -267,7 +277,7 @@
         const isSym = !!SYM[kind], c = PAL.accent[i % PAL.accent.length];
         const at = V((i % 2 ? 1 : -1) * (1.8 + 0.9 * (i % 3)), 0, -i * 4.6);
         const base = group(cyl(1.15, 1.2, 0.22, new THREE.MeshBasicMaterial({ color: new THREE.Color(PAL.bottom) }), [0, 0.11, 0], [0, 0, 0], 64), mesh(new THREE.TorusGeometry(1.17, 0.025, 8, 96), RING(c), [0, 0.22, 0], [Math.PI / 2, 0, 0]));
-        base.position.copy(at); world.add(base);
+        base.position.copy(at); base.visible = ENV !== 'space'; world.add(base);   // nothing to stand on in orbit
         const obj = isSym ? SYM[kind](c) : OBJ[kind]();
         neonize(obj, c);
         const holder = new THREE.Group(); holder.add(obj); holder.position.copy(at).add(V(0, isSym ? 1.35 : 0.22, 0)); world.add(holder);
@@ -387,7 +397,7 @@
 
       // ─── the hologram city on both sides and dust in the air (as in the hologram look) ───
       const len = SEGS.length * 4.2 + 20, cityMat = new THREE.LineBasicMaterial(Object.assign({ color: PAL.grid, opacity: 0.3 }, ADD)), win = [], winC = [];
-      for (let k = 0; k < 50; k++) {
+      for (let k = 0; k < (ENV === 'studio' ? 50 : 0); k++) {   // the old hologram city: the studio only, the other worlds bring their own
         const h = 3 + 12 * hash(k + 3), side = k % 2 ? 1 : -1, w = 1.8 + 2 * hash(k), d = 1.8 + 2 * hash(k + 9);
         const x = side * (7 + 12 * hash(k + 5)), z = 10 - k * len / 50;
         const b = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)), cityMat); b.position.set(x, h / 2, z); world.add(b);
@@ -401,16 +411,83 @@
       const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.BufferAttribute(dust, 3));
       world.add(new THREE.Points(dg, new THREE.PointsMaterial(Object.assign({ color: 0xdcd6ff, size: 0.04, opacity: 0.7 }, ADD))));
 
+      // ─── the world the story happens in (VIDEO.env, picked by the writer), dressed with library models in the same
+      // glass look but dimmer, so the objects the lines talk about stay the brightest things on screen ───
+      const dress = (name, x, z, height, rot = 0) => {
+        if (!OBJ[name]) return null;
+        const m = OBJ[name](); neonize(m, PAL.accent[0]);
+        const mats = new Set(); m.traverse(o => { if (o.material) mats.add(o.material); });   // parts share materials: dim each one once
+        for (const mt of mats) { if (mt.uniforms && mt.uniforms.c) mt.uniforms.c.value.multiplyScalar(0.6); if (mt.isLineBasicMaterial) mt.opacity *= 0.55; }
+        const box = new THREE.Box3().setFromObject(m), size = box.getSize(V());
+        m.scale.setScalar(height / Math.max(size.y, 1e-6)); m.position.set(x, 0, z); m.rotation.y = rot; world.add(m); return m;
+      };
+      const pathEnd = -SEGS.length * 4.6 - 12;
+      if (ENV === 'city') {
+        // a main avenue the camera travels down (the spots stand on it), blocks of buildings on both sides, cross streets,
+        // parked cars and traffic lights at the corners: the Grouper city
+        const towers = ['city_building', 'apartment_building', 'skyscraper', 'glass_skyscraper', 'office_building', 'tower_building', 'city_building_color'].filter(n => OBJ[n]);
+        const cars = ['sports_car', 'police_car', 'delivery_truck'].filter(n => OBJ[n]);
+        const road = [];
+        for (let z = 14; z > pathEnd; z -= 12) {
+          for (const side of [-1, 1]) for (let col = 0; col < 3; col++) {
+            const k = Math.round(z * 7 + side * 3 + col * 11);
+            if (towers.length) dress(towers[Math.floor(hash(k) * towers.length)], side * (8 + col * 6 + 1.5 * hash(k + 1)), z - 2 - 6 * hash(k + 2), 4 + 9 * hash(k + 3) + col * 3, hash(k + 4) * 6.28);
+          }
+          road.push(-40, 0.01, z - 9, 40, 0.01, z - 9, -40, 0.01, z - 11, 40, 0.01, z - 11);                 // a cross street
+          if (cars.length) dress(cars[Math.floor(hash(z) * cars.length)], (hash(z + 5) > 0.5 ? 1 : -1) * 5.6, z - 5, 0.9, Math.PI / 2 * (hash(z + 6) > 0.5 ? 1 : -1));
+          if (OBJ.traffic_light) dress('traffic_light', 6.2, z - 8.4, 2.6, -Math.PI / 2);
+        }
+        for (const x of [-6.5, 6.5]) road.push(x, 0.01, 20, x, 0.01, pathEnd - 20);                          // the avenue's curbs
+        for (let z = 18; z > pathEnd - 20; z -= 3) road.push(0, 0.012, z, 0, 0.012, z - 1.4);                // dashed centre line
+        const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(road, 3));
+        world.add(new THREE.LineSegments(rg, new THREE.LineBasicMaterial({ color: new THREE.Color(PAL.accent[1]), transparent: true, opacity: 0.45 })));
+      } else if (ENV === 'home') {
+        // a long room: walls with windows and doors, furniture along both walls, a tiled floor (the grid)
+        const furniture = ['sofa', 'fridge', 'floor_lamp', 'desk', 'bed', 'tv_flat', 'washing_machine', 'office_chair'].filter(n => OBJ[n]);
+        const H = { sofa: 1.0, fridge: 2.0, floor_lamp: 1.9, desk: 0.9, bed: 0.8, tv_flat: 1.0, washing_machine: 1.0, office_chair: 1.1 };
+        const wall = [];
+        for (const x of [-7.5, 7.5]) {
+          wall.push(x, 0, 16, x, 0, pathEnd - 10, x, 3.4, 16, x, 3.4, pathEnd - 10);
+          for (let z = 16; z > pathEnd - 10; z -= 4) wall.push(x, 0, z, x, 3.4, z);
+        }
+        const wg2 = new THREE.BufferGeometry(); wg2.setAttribute('position', new THREE.Float32BufferAttribute(wall, 3));
+        world.add(new THREE.LineSegments(wg2, new THREE.LineBasicMaterial({ color: new THREE.Color(PAL.accent[1]), transparent: true, opacity: 0.35 })));
+        let n = 0;
+        for (let z = 10; z > pathEnd; z -= 5.5) for (const side of [-1, 1]) {
+          const name = furniture[n++ % Math.max(1, furniture.length)];
+          if (name) dress(name, side * 6.0, z - 2 * hash(n), H[name] || 1, side > 0 ? -Math.PI / 2 : Math.PI / 2);
+          if (n % 3 === 0 && OBJ.window) dress('window', side * 7.45, z - 1, 1.6, side > 0 ? -Math.PI / 2 : Math.PI / 2)?.position.setY(1.1);
+        }
+      } else if (ENV === 'space') {
+        // no floor: a planet curving below, a ringed planet far off, satellites on orbit lines, a deeper star field
+        floorGrid.visible = false;
+        const planet = OBJ.earth ? dress('earth', 0, pathEnd / 2, 60) : null;
+        if (planet) planet.position.set(0, -64, pathEnd / 2);
+        if (OBJ.saturn) dress('saturn', -26, pathEnd - 30, 14)?.position.setY(8);
+        if (OBJ.comm_satellite) for (let k = 0; k < 4; k++) dress('comm_satellite', (k % 2 ? 1 : -1) * (13 + 5 * hash(k)), pathEnd * hash(k + 3), 1.4, hash(k) * 6)?.position.setY(5 + 3 * hash(k + 1));   // off the camera path
+        const orbit = [];
+        for (let r = 0; r < 3; r++) for (let a = 0; a < 128; a++) {
+          const t0 = a / 128 * Math.PI * 2, t1 = (a + 1) / 128 * Math.PI * 2, R = 30 + r * 9;
+          orbit.push(Math.cos(t0) * R, 2 + r * 1.5, pathEnd / 2 + Math.sin(t0) * R, Math.cos(t1) * R, 2 + r * 1.5, pathEnd / 2 + Math.sin(t1) * R);
+        }
+        const og = new THREE.BufferGeometry(); og.setAttribute('position', new THREE.Float32BufferAttribute(orbit, 3));
+        world.add(new THREE.LineSegments(og, new THREE.LineBasicMaterial({ color: new THREE.Color(PAL.accent[1]), transparent: true, opacity: 0.25 })));
+        const NS = 1600, stars = new Float32Array(NS * 3);
+        for (let k = 0; k < NS; k++) stars.set([(hash(k + 900) - 0.5) * 160, (hash(k + 901) - 0.2) * 70, 30 - hash(k + 902) * (60 - pathEnd)], k * 3);
+        const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(stars, 3));
+        world.add(new THREE.Points(sg, new THREE.PointsMaterial(Object.assign({ color: 0xe8e4ff, size: 0.09, opacity: 0.85 }, ADD))));
+      }
+
       // ─── bloom: bright parts blurred at quarter size and added back, so the lines glow ───
       const DPR = window.devicePixelRatio || 1, FW = Math.round(W * DPR), FH = Math.round(H * DPR), QW = Math.round(FW / 4), QH = Math.round(FH / 4);
       const rtScene = new THREE.WebGLRenderTarget(FW, FH, { samples: 4, type: THREE.HalfFloatType }), rtA = new THREE.WebGLRenderTarget(QW, QH, { type: THREE.HalfFloatType }), rtB = new THREE.WebGLRenderTarget(QW, QH, { type: THREE.HalfFloatType });
       const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), quadScene = new THREE.Scene(), quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2)); quadScene.add(quad);
       const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
-      const bright = new THREE.ShaderMaterial({ uniforms: { t: { value: null } }, vertexShader: VS, fragmentShader: 'uniform sampler2D t; varying vec2 vUv; void main(){ vec4 c = texture2D(t, vUv); float l = max(c.r, max(c.g, c.b)); gl_FragColor = vec4(c.rgb * smoothstep(0.25, 0.85, l), 1.0); }' });
+      const bright = new THREE.ShaderMaterial({ uniforms: { t: { value: null } }, vertexShader: VS, fragmentShader: `uniform sampler2D t; varying vec2 vUv; void main(){ vec4 c = texture2D(t, vUv); float l = max(c.r, max(c.g, c.b)); gl_FragColor = vec4(c.rgb * smoothstep(${PAL.glass ? '0.6, 1.0' : '0.25, 0.85'}, l), 1.0); }` });
       const blur = new THREE.ShaderMaterial({ uniforms: { t: { value: null }, d: { value: new THREE.Vector2() } }, vertexShader: VS,
         fragmentShader: 'uniform sampler2D t; uniform vec2 d; varying vec2 vUv; void main(){ vec3 c = texture2D(t, vUv).rgb * 0.227; c += (texture2D(t, vUv + d * 1.385).rgb + texture2D(t, vUv - d * 1.385).rgb) * 0.316; c += (texture2D(t, vUv + d * 3.231).rgb + texture2D(t, vUv - d * 3.231).rgb) * 0.070; gl_FragColor = vec4(c, 1.0); }' });
       const comp = new THREE.ShaderMaterial({ uniforms: { base: { value: null }, glow: { value: null }, fl: { value: 0 } }, vertexShader: VS,
-        fragmentShader: 'uniform sampler2D base; uniform sampler2D glow; uniform float fl; varying vec2 vUv; void main(){ vec3 c = texture2D(base, vUv).rgb + texture2D(glow, vUv).rgb * (1.3 + 2.0 * fl); float v = 1.0 - smoothstep(0.35, 1.15, length(vUv - 0.5) * 1.6); c *= mix(0.6, 1.0, v); c = mix(c, vec3(1.0), clamp(fl, 0.0, 1.0) * 0.3); gl_FragColor = vec4(pow(c, vec3(1.0 / 2.2)), 1.0); }' });
+        fragmentShader: `uniform sampler2D base; uniform sampler2D glow; uniform float fl; varying vec2 vUv; void main(){ vec3 c = texture2D(base, vUv).rgb + texture2D(glow, vUv).rgb * (${PAL.glass ? '0.45' : '1.3'} + 2.0 * fl); float v = 1.0 - smoothstep(0.35, 1.15, length(vUv - 0.5) * 1.6); c *= mix(0.6, 1.0, v); c = mix(c, vec3(1.0), clamp(fl, 0.0, 1.0) * 0.3); gl_FragColor = vec4(pow(c, vec3(1.0 / 2.2)), 1.0); }` });
       const pass = (mat, target) => { quad.material = mat; renderer.setRenderTarget(target); renderer.render(quadScene, quadCam); };
       renderer.outputColorSpace = THREE.LinearSRGBColorSpace;   // the composite pass does the sRGB curve itself
       function draw() {
