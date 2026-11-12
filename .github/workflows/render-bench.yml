@@ -38,3 +38,8 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m playwright install --with-deps chromium
       - run: '[[ "$VID" =~ ^[0-9]+$ ]] && [[ "$SECS" =~ ^[0-9.]+$ ]] && python -m agents.channel.bench "$VID" "$SECS"'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-frames
+          path: bench-frames/

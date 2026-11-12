@@ -40,6 +40,19 @@ def main() -> None:
             took = time.monotonic() - t0
             tail = (res.stdout + res.stderr).strip().splitlines()[-3:]
             print(f"[bench] {gl}: {took:.1f}s for {secs:g}s of video (exit {res.returncode}) | {' / '.join(tail)}")
+            # one frame per backend, kept as an artifact: a fast but black or broken render must not pass as a win
+            frames = Path(os.environ.get("BENCH_OUT", "bench-frames")).resolve()
+            frames.mkdir(exist_ok=True)
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(secs / 2), "-i", str(work / "out" / "final.mp4"), "-frames:v", "1",
+                            str(frames / f"{gl}.png")], check=False)
+    try:
+        from PIL import Image, ImageChops
+        a, b = (Image.open(f"{os.environ.get('BENCH_OUT', 'bench-frames')}/{g}.png").convert("RGB") for g in ("swiftshader", "llvmpipe"))
+        diff = ImageChops.difference(a, b).convert("L")
+        mean = sum(diff.getdata()) / (diff.width * diff.height)
+        print(f"[bench] frame difference swiftshader vs llvmpipe: mean {mean:.2f}/255, brightness {sum(a.convert('L').getdata()) / (a.width * a.height):.1f} vs {sum(b.convert('L').getdata()) / (b.width * b.height):.1f}")
+    except Exception as e:  # noqa: BLE001
+        print(f"[bench] frame compare skipped: {e}")
 
 
 if __name__ == "__main__":
