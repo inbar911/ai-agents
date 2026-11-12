@@ -1,0 +1,40 @@
+name: render-bench
+
+# Manual: render the same seconds of a real channel video with SwiftShader and with Mesa llvmpipe, and time both.
+on:
+  workflow_dispatch:
+    inputs:
+      id:
+        description: "channel_videos id"
+        required: true
+        type: string
+        default: "29"
+      seconds:
+        description: "seconds of video to render"
+        required: false
+        type: string
+        default: "6"
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      PYTHONUNBUFFERED: "1"
+      VID: ${{ inputs.id }}
+      SECS: ${{ inputs.seconds }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg xvfb libgl1-mesa-dri libegl-mesa0 mesa-utils
+      - run: pip install -r requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: '[[ "$VID" =~ ^[0-9]+$ ]] && [[ "$SECS" =~ ^[0-9.]+$ ]] && python -m agents.channel.bench "$VID" "$SECS"'

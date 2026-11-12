@@ -52,8 +52,11 @@ FF = find_ffmpeg()
 def open_page(p, scale, sub=1, fps=None):
     """opens index.html at the given capture scale. window.RENDER tells core.js the shutter setup (for tf mb blur)."""
     from playwright.sync_api import Error
+    # GL=llvmpipe: Mesa's multi-threaded CPU rasterizer through ANGLE/GL (needs an X display: run under xvfb-run);
+    # several times faster than Chromium's built-in SwiftShader on GPU-less runners
+    gl = (["--use-angle=gl", "--ignore-gpu-blocklist"] if os.environ.get("GL") == "llvmpipe" else ["--enable-unsafe-swiftshader"])
     b = p.chromium.launch(args=["--force-color-profile=srgb", "--disable-lcd-text", "--font-render-hinting=none",
-                                "--allow-file-access-from-files", "--enable-unsafe-swiftshader"])
+                                "--allow-file-access-from-files", *gl])
     pg = b.new_page(viewport={"width": 400, "height": 400}, device_scale_factor=scale)
     pg.add_init_script(f"window.RENDER = {{sub: {int(sub)}, fps: {json.dumps(fps)}}};")
     errors = []
