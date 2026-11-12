@@ -73,6 +73,14 @@
       const sph = (r, mat, at) => mesh(new THREE.SphereGeometry(r, 32, 24), mat, at);
       const group = (...parts) => { const g = new THREE.Group(); parts.forEach(p => g.add(p)); return g; };
       const plane = (w, h, mat, at, rot) => mesh(new THREE.PlaneGeometry(w, h), mat, at, rot);
+      // a rounded rectangle with true corner radii (a phone's outline), and a flat plate extruded from it with a small
+      // bevel: real devices are flat slabs with round corners, not the puffy pill a RoundedBox makes
+      const rrShape = (w, h, r) => { const s = new THREE.Shape(), x = w / 2 - r, y = h / 2 - r; s.moveTo(-w / 2 + r, -h / 2); s.lineTo(x, -h / 2); s.absarc(x, -y, r, -Math.PI / 2, 0); s.lineTo(w / 2, y); s.absarc(x, y, r, 0, Math.PI / 2); s.lineTo(-x, h / 2); s.absarc(-x, y, r, Math.PI / 2, Math.PI); s.lineTo(-w / 2, -y); s.absarc(-x, -y, r, Math.PI, Math.PI * 1.5); return s; };
+      const slab = (w, h, d, r, bev, mat, at, rot) => {
+        const geo = new THREE.ExtrudeGeometry(rrShape(w - 2 * bev, h - 2 * bev, Math.max(0.002, r - bev)), { depth: Math.max(0.001, d - 2 * bev), bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 3, curveSegments: 14 });
+        geo.translate(0, 0, -Math.max(0.001, d - 2 * bev) / 2); return mesh(geo, mat, at, rot);
+      };
+      const fitUV = (geo, w, h) => { const p = geo.attributes.position, uv = geo.attributes.uv; for (let k = 0; k < uv.count; k++) uv.setXY(k, p.getX(k) / w + 0.5, p.getY(k) / h + 0.5); uv.needsUpdate = true; };
 
       const GLASS = (c) => new THREE.ShaderMaterial({
         uniforms: { c: { value: new THREE.Color(c) }, body: { value: new THREE.Color('#0c0a2a') } }, side: THREE.DoubleSide, transparent: true, depthWrite: false,
@@ -95,7 +103,7 @@
         const meshes = []; root.traverse(o => { if (o.isMesh) meshes.push(o); });
         for (const m of meshes) {
           m.castShadow = m.receiveShadow = false;
-          if (m.material.emissiveMap) { m.material = new THREE.MeshBasicMaterial(Object.assign({ map: m.material.emissiveMap, opacity: 0.45 }, ADD)); continue; }   // screens keep their picture
+          if (m.material.emissiveMap) { m.material = new THREE.MeshBasicMaterial(Object.assign({ map: m.material.emissiveMap, color: new THREE.Color(m.material.userData.tint || 0xffffff), opacity: m.material.userData.tint ? 0.85 : 0.45 }, ADD)); continue; }   // screens keep their picture
           if (m.material.emissive && m.material.emissive.getHex() !== 0 && m.material.emissiveIntensity >= 1) { m.material = new THREE.MeshBasicMaterial(Object.assign({ color: m.material.emissive }, ADD)); continue; }   // LEDs
           const light = m.material === M.white || m.material === M.chrome;   // white/chrome details (a rune, a shackle) read as the bright part
           m.material = light ? rimLight : rim;
@@ -107,15 +115,17 @@
 
       // ─── screens drawn on canvases (a phone home screen, a laptop window, a watch face, a TV picture) ───
       const roundRect = (x, X, Y, w, h, r) => { x.beginPath(); x.roundRect(X, Y, w, h, r); x.fill(); };
-      const APP = ['#34c759', '#0a84ff', '#ff9f0a', '#ff375f', '#5e5ce6', '#64d2ff', '#ffd60a', '#bf5af2', '#ff453a', '#30d158', '#0a84ff', '#ff9f0a'];
-      const phoneScreen = tex(512, 1060, (x, w, h) => {
+      // screens in the Grouper look stay inside the one palette (lavender UI), the old palettes keep app colours
+      const APP = PAL.glass ? ['#c9c5ff', '#9d97ff', '#b7b1ff', '#8e88f5', '#d8d5ff', '#a9a3ff'] : ['#34c759', '#0a84ff', '#ff9f0a', '#ff375f', '#5e5ce6', '#64d2ff', '#ffd60a', '#bf5af2', '#ff453a', '#30d158', '#0a84ff', '#ff9f0a'];
+      const phoneScreenOf = (hole) => tex(512, 1060, (x, w, h) => {
         const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, PAL.accent[0]); g.addColorStop(1, PAL.accent[1]); x.fillStyle = g; x.fillRect(0, 0, w, h);
         x.fillStyle = 'rgba(255,255,255,0.95)'; x.font = '600 44px Rubik'; x.textAlign = 'center'; x.fillText('9:41', 110, 72);
-        x.fillStyle = '#000'; roundRect(x, w / 2 - 70, 26, 140, 42, 21);                       // the camera pill
+        x.fillStyle = '#000'; if (hole) { x.beginPath(); x.arc(w / 2, 46, 20, 0, 7); x.fill(); } else roundRect(x, w / 2 - 54, 26, 108, 38, 19);   // punch hole or (25% smaller) island
         for (let k = 0; k < 16; k++) { x.fillStyle = APP[k % APP.length]; roundRect(x, 46 + (k % 4) * 112, 170 + Math.floor(k / 4) * 132, 84, 84, 22); }
         x.fillStyle = 'rgba(255,255,255,0.3)'; roundRect(x, 28, h - 170, w - 56, 130, 44);   // dock
         for (let k = 0; k < 4; k++) { x.fillStyle = APP[(k * 3 + 1) % APP.length]; roundRect(x, 56 + k * 112, h - 147, 84, 84, 22); }
       });
+      const phoneScreen = phoneScreenOf(false), phoneScreenUltra = phoneScreenOf(true);
       const laptopScreen = tex(1024, 640, (x, w, h) => {
         x.fillStyle = '#f2f4f8'; x.fillRect(0, 0, w, h);
         x.fillStyle = '#d9dde5'; x.fillRect(0, 0, w, 54); ['#ff5f57', '#febc2e', '#28c840'].forEach((c, k) => { x.fillStyle = c; x.beginPath(); x.arc(30 + k * 32, 27, 10, 0, 7); x.fill(); });
@@ -130,9 +140,9 @@
         x.fillStyle = '#fff'; x.font = '700 40px Rubik'; x.textAlign = 'center'; x.fillText('10:09', w / 2, h / 2 + 14);
       });
       const tvScreen = tex(1024, 576, (x, w, h) => {
-        const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#5ac8fa'); g.addColorStop(1, '#ffe29a'); x.fillStyle = g; x.fillRect(0, 0, w, h);
-        x.fillStyle = '#ffcc00'; x.beginPath(); x.arc(780, 160, 70, 0, 7); x.fill();
-        x.fillStyle = '#34c759'; x.beginPath(); x.moveTo(0, h); x.lineTo(300, 300); x.lineTo(560, h); x.fill(); x.fillStyle = '#30a14e'; x.beginPath(); x.moveTo(360, h); x.lineTo(700, 260); x.lineTo(1024, h); x.fill();
+        const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, PAL.glass ? '#2a2670' : '#5ac8fa'); g.addColorStop(1, PAL.glass ? '#8c86f0' : '#ffe29a'); x.fillStyle = g; x.fillRect(0, 0, w, h);
+        x.fillStyle = PAL.glass ? '#e6e3ff' : '#ffcc00'; x.beginPath(); x.arc(780, 160, 70, 0, 7); x.fill();
+        x.fillStyle = PAL.glass ? '#5b55c9' : '#34c759'; x.beginPath(); x.moveTo(0, h); x.lineTo(300, 300); x.lineTo(560, h); x.fill(); x.fillStyle = PAL.glass ? '#4a44b0' : '#30a14e'; x.beginPath(); x.moveTo(360, h); x.lineTo(700, 260); x.lineTo(1024, h); x.fill();
       });
       const earthTex = tex(1024, 512, (x, w, h) => {
         x.fillStyle = '#1e6fd9'; x.fillRect(0, 0, w, h);
@@ -142,20 +152,76 @@
       const keysTex = tex(512, 200, (x, w, h) => { x.fillStyle = '#2a2d33'; x.fillRect(0, 0, w, h); x.fillStyle = '#111317'; for (let r = 0; r < 5; r++) for (let c = 0; c < 14; c++) roundRect(x, 6 + c * 36, 8 + r * 38, 30, 32, 5); });
       const bayTex = tex(256, 512, (x, w, h) => { x.fillStyle = '#1f232a'; x.fillRect(0, 0, w, h); for (let k = 0; k < 10; k++) { x.fillStyle = '#2c313a'; roundRect(x, 14, 14 + k * 50, w - 28, 40, 6); x.fillStyle = k % 3 ? '#22d36b' : '#2f7bff'; x.beginPath(); x.arc(w - 36, 34 + k * 50, 6, 0, 7); x.fill(); } });
       const panelTex = tex(256, 256, (x, w, h) => { x.fillStyle = '#1f3e9a'; x.fillRect(0, 0, w, h); x.strokeStyle = '#7fa6ff'; x.lineWidth = 3; for (let k = 0; k <= 8; k++) { x.beginPath(); x.moveTo(k * 32, 0); x.lineTo(k * 32, h); x.stroke(); x.beginPath(); x.moveTo(0, k * 32); x.lineTo(w, k * 32); x.stroke(); } });
+      const rackTex = tex(512, 1760, (x, w, h) => {
+        x.fillStyle = '#0d0f14'; x.fillRect(0, 0, w, h);
+        let y = 8;
+        for (let k = 0; y < h - 40; k++) {
+          const u = k % 5 === 2 ? 2 : 1, hh = 38 * u;                                   // 1U and 2U servers
+          x.fillStyle = '#22262e'; roundRect(x, 10, y, w - 20, hh - 4, 4);
+          for (let b = 0; b < (u === 2 ? 12 : 8); b++) { x.fillStyle = '#353b46'; roundRect(x, 22 + b * (u === 2 ? 30 : 42), y + 5, u === 2 ? 24 : 34, hh - 14, 3); }   // drive bays
+          x.fillStyle = hash(k) > 0.25 ? '#3fd06b' : '#ffb340'; x.beginPath(); x.arc(w - 40, y + hh / 2, 5, 0, 7); x.fill();
+          x.fillStyle = '#3d7bff'; x.beginPath(); x.arc(w - 24, y + hh / 2, 5, 0, 7); x.fill();
+          y += hh;
+        }
+      });
+      const boardTex = tex(1024, 1024, (x, w, h) => {
+        x.fillStyle = '#000'; x.fillRect(0, 0, w, h); x.strokeStyle = '#7a8a7f'; x.lineWidth = 3;
+        for (let k = 0; k < 90; k++) {                                                    // traces running to the socket
+          const sx = hash(k) * w, sy = hash(k + 50) * h, mx = sx + (hash(k + 7) - 0.5) * 300;
+          x.beginPath(); x.moveTo(sx, sy); x.lineTo(mx, sy); x.lineTo(w / 2 + (hash(k + 9) - 0.5) * 380, h / 2 + (hash(k + 11) - 0.5) * 380); x.stroke();
+        }
+        x.fillStyle = '#9aa69e'; for (let k = 0; k < 140; k++) { x.beginPath(); x.arc(hash(k + 300) * w, hash(k + 400) * h, 4, 0, 7); x.fill(); }   // vias
+      });
+      const earthMask = await new THREE.TextureLoader().loadAsync('textures/earth.jpg');   // NASA land mask (via three.js examples)
+      earthMask.colorSpace = THREE.SRGBColorSpace;
 
       // ─── the object library. Each builder returns a group sitting on y = 0, about 1-2 units tall ───
       const OBJ = {
+        // Phones built from the real devices' measurements (1 unit = 100 mm), no logos (trademarks).
+        // phone: iPhone 18 Pro Max style (163.4 x 78.0 x 8.75 mm, full-width camera plateau, 3 big lenses, Dynamic Island)
         phone: () => {
-          const g = group(rbox(0.78, 1.6, 0.085, 0.11, M.titanium), rbox(0.74, 1.56, 0.02, 0.1, M.glass, [0, 0, 0.034]),
-            plane(0.68, 1.48, screenMat(phoneScreen), [0, 0, 0.0451]), rbox(0.34, 0.34, 0.03, 0.07, M.glass, [-0.17, 0.55, -0.055]));
-          [[-0.25, 0.63], [-0.1, 0.63], [-0.25, 0.48]].forEach(([x, y]) => g.add(cyl(0.055, 0.055, 0.03, M.lens, [x, y, -0.075], [Math.PI / 2, 0, 0]), cyl(0.065, 0.065, 0.02, M.chrome, [x, y, -0.066], [Math.PI / 2, 0, 0])));
-          g.rotation.x = -0.12; g.position.y = 0.83; return group(g);
+          const W = 0.78, H = 1.634, D = 0.0875, R = 0.115;
+          const g = group(slab(W, H, D, R, 0.012, M.titanium), slab(W - 0.01, H - 0.01, 0.012, R - 0.005, 0.004, M.glass, [0, 0, D / 2 - 0.004]),
+            mesh(new THREE.ShapeGeometry(rrShape(W - 0.05, H - 0.05, R - 0.025), 16), screenMat(phoneScreen), [0, 0, D / 2 + 0.0035]));
+          fitUV(g.children[2].geometry, W - 0.05, H - 0.05);
+          // the camera plateau: across the whole back, the top 30%, raised 2.8 mm
+          g.add(slab(W - 0.04, 0.46, 0.028, 0.08, 0.006, M.titanium, [0, H / 2 - 0.25, -D / 2 - 0.012]));
+          g.add(slab(0.36, 0.36, 0.012, 0.075, 0.004, M.glass, [-0.17, H / 2 - 0.25, -D / 2 - 0.028]));
+          [[-0.255, H / 2 - 0.165], [-0.085, H / 2 - 0.25], [-0.255, H / 2 - 0.335]].forEach(([x, y]) => g.add(
+            cyl(0.0825, 0.0825, 0.022, M.titanium, [x, y, -D / 2 - 0.04], [Math.PI / 2, 0, 0], 48), cyl(0.062, 0.062, 0.024, M.lens, [x, y, -D / 2 - 0.042], [Math.PI / 2, 0, 0], 48)));
+          g.add(cyl(0.028, 0.028, 0.01, M.white, [0.2, H / 2 - 0.19, -D / 2 - 0.03], [Math.PI / 2, 0, 0]), cyl(0.026, 0.026, 0.01, M.lens, [0.2, H / 2 - 0.31, -D / 2 - 0.03], [Math.PI / 2, 0, 0]));   // flash, LiDAR
+          [[0.13, 0.17], [0.42, 0.1]].forEach(([y, h]) => g.add(rbox(0.01, h, 0.03, 0.005, M.titanium, [W / 2 + 0.003, H / 2 - y - h / 2, 0])));   // buttons
+          g.add(rbox(0.012, 0.11, 0.025, 0.005, M.glass, [W / 2 + 0.002, -0.2, 0]));   // camera control
+          g.rotation.x = -0.12; g.position.y = 0.84; return group(g);
         },
+        // phone_ultra: Galaxy S26 Ultra style (163.6 x 78.1 x 7.9 mm, flat frame, rounder corners than the S25, raised camera island, S Pen)
+        phone_ultra: () => {
+          const W = 0.781, H = 1.636, D = 0.079, R = 0.075;
+          const g = group(slab(W, H, D, R, 0.006, M.titanium), slab(W - 0.008, H - 0.008, 0.01, R - 0.004, 0.003, M.glass, [0, 0, D / 2 - 0.003]),
+            mesh(new THREE.ShapeGeometry(rrShape(W - 0.035, H - 0.035, R - 0.02), 16), screenMat(phoneScreenUltra), [0, 0, D / 2 + 0.003]));
+          fitUV(g.children[2].geometry, W - 0.035, H - 0.035);
+          // camera island: a raised pill holding three big lenses in a column, with the periscope, flash and laser beside it
+          g.add(slab(0.2, 0.62, 0.022, 0.1, 0.006, M.glass, [-0.24, H / 2 - 0.4, -D / 2 - 0.011]));
+          [0.18, 0.4, 0.62].forEach(y => g.add(cyl(0.072, 0.072, 0.02, M.chrome, [-0.24, H / 2 - y, -D / 2 - 0.03], [Math.PI / 2, 0, 0], 48), cyl(0.055, 0.055, 0.022, M.lens, [-0.24, H / 2 - y, -D / 2 - 0.032], [Math.PI / 2, 0, 0], 48)));
+          g.add(slab(0.11, 0.11, 0.016, 0.02, 0.004, M.lens, [-0.05, H / 2 - 0.2, -D / 2 - 0.012]));   // periscope window
+          g.add(cyl(0.022, 0.022, 0.008, M.white, [-0.05, H / 2 - 0.33, -D / 2 - 0.006], [Math.PI / 2, 0, 0]), cyl(0.016, 0.016, 0.008, M.lens, [-0.05, H / 2 - 0.42, -D / 2 - 0.006], [Math.PI / 2, 0, 0]));
+          g.add(rbox(0.05, 0.012, 0.03, 0.005, M.black, [-0.22, -H / 2 + 0.004, 0]));   // the S Pen tip at the bottom edge
+          [[0.3, 0.2], [0.55, 0.09]].forEach(([y, h]) => g.add(rbox(0.009, h, 0.025, 0.004, M.titanium, [W / 2 + 0.003, H / 2 - y - h / 2, 0])));
+          g.rotation.x = -0.12; g.position.y = 0.84; return group(g);
+        },
+        // MacBook Pro 14 style (312.6 x 221.2 x 15.5 mm, 1 unit = 160 mm): flat aluminium base, black keys in a well,
+        // a big trackpad, thin bezels with the camera notch, lid open ~110 degrees. No logo.
         laptop: () => {
-          const lid = group(rbox(1.9, 1.2, 0.04, 0.04, M.alu, [0, 0.6, 0]), plane(1.78, 1.08, M.black, [0, 0.6, 0.021]), plane(1.7, 1.0, screenMat(laptopScreen), [0, 0.6, 0.022]));
-          lid.position.set(0, 0.05, -0.65); lid.rotation.x = -0.25;
-          return group(rbox(1.9, 0.06, 1.3, 0.03, M.alu, [0, 0.03, 0]), plane(1.6, 0.6, new THREE.MeshStandardMaterial({ map: keysTex, roughness: 0.6 }), [0, 0.061, -0.2], [-Math.PI / 2, 0, 0]),
-            rbox(0.6, 0.005, 0.36, 0.02, M.titanium, [0, 0.061, 0.36]), lid);
+          const W = 1.954, Dp = 1.383, R = 0.075, flat = [-Math.PI / 2, 0, 0];
+          const base = group(slab(W, Dp, 0.058, R, 0.012, M.alu, [0, 0.029, 0], flat),
+            plane(W * 0.86, Dp * 0.42, new THREE.MeshStandardMaterial({ map: keysTex, roughness: 0.6 }), [0, 0.0595, -0.2], flat),
+            slab(0.94, 0.6, 0.004, 0.03, 0.001, M.titanium, [0, 0.059, 0.33], flat));
+          const lid = group(slab(W, Dp, 0.034, R, 0.008, M.alu, [0, Dp / 2, 0]),
+            mesh(new THREE.ShapeGeometry(rrShape(W - 0.04, Dp - 0.04, R - 0.02), 12), M.black, [0, Dp / 2, 0.0175]),
+            plane(W - 0.1, Dp - 0.12, screenMat(laptopScreen), [0, Dp / 2 - 0.02, 0.018]),
+            rbox(0.2, 0.05, 0.004, 0.02, M.black, [0, Dp - 0.08, 0.0195]));   // the notch
+          lid.position.set(0, 0.058, -Dp / 2 + 0.02); lid.rotation.x = -0.3;
+          return group(base, lid);
         },
         router: () => {
           const g = group(rbox(1.5, 0.32, 1.0, 0.12, M.white, [0, 0.16, 0]));
@@ -163,19 +229,49 @@
           [-0.4, -0.2, 0, 0.2, 0.4].forEach((x, k) => g.add(sph(0.025, glow(k === 2 ? '#2f7bff' : '#22d36b', 3), [x, 0.22, 0.5])));
           return g;
         },
+        // AirPods Pro style (case 60.6 wide x 45.2 tall x 21.7 deep, 1 unit = 50 mm): the glossy white pebble open, its lid
+        // tilted back on the hinge, and the two buds standing in their slots: an egg-shaped head with the silicone tip
+        // facing out and the short stem going down into the case. No logo.
         earbuds: () => {
-          const bud = (x) => group(sph(0.16, M.white, [0, 0.1, 0]), cyl(0.045, 0.04, 0.38, M.white, [0, -0.15, 0.02]), sph(0.06, M.black, [0, 0.1, 0.15]));
-          const l = bud(-0.32), r = bud(0.32); l.position.set(-0.32, 1.25, 0); r.position.set(0.32, 1.25, 0); r.rotation.z = -0.25; l.rotation.z = 0.25;
-          return group(rbox(1.0, 0.75, 0.42, 0.2, M.white, [0, 0.375, 0]), cyl(0.025, 0.025, 0.02, glow('#22d36b'), [0, 0.45, 0.215], [Math.PI / 2, 0, 0]), l, r);
+          const tip = new THREE.MeshPhysicalMaterial({ color: 0xe6e9ee, roughness: 0.8 });
+          const bud = (side) => {
+            const head = mesh(new THREE.SphereGeometry(0.2, 40, 28), M.white, [0, 0.16, 0]); head.scale.set(1, 0.85, 0.9);
+            const b = group(head, mesh(new THREE.SphereGeometry(0.12, 32, 20), tip, [side * 0.14, 0.2, 0.08]),
+              rbox(0.11, 0.48, 0.1, 0.05, M.white, [0, -0.12, 0]), mesh(new THREE.CircleGeometry(0.045, 24), M.black, [0, 0.24, -0.17], [0, Math.PI, 0]));
+            b.rotation.z = -side * 0.12; return b;
+          };
+          const body = rbox(1.21, 0.62, 0.43, 0.2, M.white, [0, 0.31, 0]);
+          const lid = group(rbox(1.21, 0.3, 0.43, 0.2, M.white, [0, 0.15, 0.215])); lid.position.set(0, 0.62, -0.215); lid.rotation.x = -1.9;
+          const l = bud(-1), r = bud(1); l.position.set(-0.28, 0.72, 0.02); r.position.set(0.28, 0.72, 0.02);
+          return group(body, lid, l, r, cyl(0.016, 0.016, 0.01, glow('#4dffb0', 2), [0, 0.42, 0.216], [Math.PI / 2, 0, 0]));
         },
         watch: () => group(rbox(0.42, 1.7, 0.06, 0.03, plastic(PAL.accent[3]), [0, 0.85, -0.02]), rbox(0.78, 0.9, 0.22, 0.2, M.titanium, [0, 0.85, 0.06]),
           rbox(0.7, 0.82, 0.02, 0.17, M.glass, [0, 0.85, 0.17]), plane(0.6, 0.72, screenMat(watchFace), [0, 0.85, 0.181]), cyl(0.06, 0.06, 0.1, M.chrome, [0.42, 1.0, 0.06], [0, 0, Math.PI / 2])),
-        tv: () => group(rbox(2.4, 1.4, 0.06, 0.03, M.black, [0, 1.1, 0]), plane(2.32, 1.32, screenMat(tvScreen), [0, 1.1, 0.031]), cyl(0.08, 0.08, 0.4, M.darkMetal, [0, 0.2, -0.05]), rbox(0.9, 0.04, 0.4, 0.02, M.darkMetal, [0, 0.02, -0.05])),
-        server: () => group(rbox(1.0, 2.2, 0.9, 0.04, M.darkMetal, [0, 1.1, 0]), plane(0.88, 2.0, new THREE.MeshStandardMaterial({ map: bayTex, emissive: 0xffffff, emissiveMap: bayTex, emissiveIntensity: 0.35, roughness: 0.5 }), [0, 1.1, 0.451])),
-        chip: () => {
-          const g = group(rbox(1.6, 0.08, 1.6, 0.03, M.pcb, [0, 0.04, 0]), rbox(0.8, 0.1, 0.8, 0.03, M.black, [0, 0.13, 0]), rbox(0.5, 0.012, 0.5, 0.02, M.titanium, [0, 0.185, 0]));
-          for (let k = 0; k < 8; k++) { const o = -0.33 + k * 0.094; g.add(rbox(0.04, 0.02, 0.14, 0.005, M.gold, [o, 0.09, 0.47]), rbox(0.04, 0.02, 0.14, 0.005, M.gold, [o, 0.09, -0.47]), rbox(0.14, 0.02, 0.04, 0.005, M.gold, [0.47, 0.09, o]), rbox(0.14, 0.02, 0.04, 0.005, M.gold, [-0.47, 0.09, o])); }
+        // 65" OLED style (1446 x 830 mm panel, 1 unit = 600 mm): a razor-thin glass panel with a deeper electronics box on
+        // the lower back, thin bezels and a low centre pedestal.
+        tv: () => group(slab(2.41, 1.385, 0.018, 0.012, 0.004, M.black, [0, 1.2, 0]), plane(2.38, 1.355, screenMat(tvScreen), [0, 1.2, 0.0095]),
+          slab(1.9, 0.62, 0.07, 0.04, 0.01, M.darkMetal, [0, 0.86, -0.045]),
+          slab(0.7, 0.36, 0.05, 0.03, 0.01, M.darkMetal, [0, 0.36, -0.09], [-0.1, 0, 0]), slab(0.86, 0.5, 0.03, 0.06, 0.008, M.darkMetal, [0, 0.015, -0.1], [-Math.PI / 2, 0, 0])),
+        // a 42U data-centre rack (600 x 2000 x 1070 mm, 1 unit = 900 mm): steel frame and posts, the front full of 1U/2U
+        // servers with drive bays and status lights (drawn on rackTex, which keeps its light in the glass look).
+        server: () => {
+          const g = group(rbox(0.67, 2.22, 1.19, 0.01, M.darkMetal, [0, 1.11, 0]));
+          g.add(plane(0.6, 2.06, new THREE.MeshStandardMaterial({ map: rackTex, emissive: 0xffffff, emissiveMap: rackTex, emissiveIntensity: 0.5, roughness: 0.5 }), [0, 1.11, 0.6]));
+          for (const x of [-0.31, 0.31]) g.add(rbox(0.03, 2.22, 0.03, 0.005, M.alu, [x, 1.11, 0.6]));   // front posts
+          g.add(rbox(0.67, 0.06, 1.19, 0.01, M.darkMetal, [0, 2.22, 0]), rbox(0.7, 0.05, 1.22, 0.01, M.darkMetal, [0, 0.025, 0]));
           return g;
+        },
+        // a processor on its motherboard: the board's traces, the socket, the silver heat spreader with its chamfered
+        // corner, capacitors and the power stages around it (boardTex keeps its light in the glass look).
+        chip: () => {
+          const g = group(slab(1.8, 1.8, 0.04, 0.03, 0.006, new THREE.MeshStandardMaterial({ color: 0x14301f, emissive: 0xffffff, emissiveMap: boardTex, emissiveIntensity: 0.4 }), [0, 0.02, 0], [-Math.PI / 2, 0, 0]));
+          g.add(slab(0.86, 0.86, 0.05, 0.02, 0.006, M.darkMetal, [0, 0.065, 0], [-Math.PI / 2, 0, 0]));          // socket
+          g.add(slab(0.7, 0.7, 0.05, 0.03, 0.01, M.pcb, [0, 0.11, 0], [-Math.PI / 2, 0, 0]));                   // substrate
+          g.add(slab(0.56, 0.56, 0.05, 0.05, 0.012, M.alu, [0, 0.155, 0], [-Math.PI / 2, 0, 0]));               // heat spreader
+          for (let k = 0; k < 10; k++) g.add(cyl(0.035, 0.035, 0.09, M.alu, [-0.7 + k * 0.155, 0.065, -0.66]));    // capacitors
+          for (let k = 0; k < 6; k++) g.add(rbox(0.13, 0.05, 0.13, 0.01, M.black, [0.7, 0.045, -0.45 + k * 0.17]));   // power stages
+          for (let k = 0; k < 4; k++) g.add(rbox(0.06, 0.1, 1.2, 0.01, M.black, [-0.72 + k * 0.09, 0.07, 0.1]));      // memory slots
+          g.rotation.x = 0.6; g.position.y = 0.7; return group(g);   // tilted up to the camera
         },
         tower: () => {
           const g = group(), steel = M.alu;
@@ -193,17 +289,56 @@
           g.position.y = 1.4; g.rotation.set(0.3, 0.4, 0.15); return group(g);
         },
         cloud: () => { const g = group(...[[0, 0, 0, 0.55], [-0.55, -0.12, 0, 0.4], [0.55, -0.1, 0.05, 0.42], [0.2, 0.3, -0.05, 0.4], [-0.25, 0.25, 0.05, 0.35]].map(([x, y, z, r]) => sph(r, M.white, [x, y, z]))); g.position.y = 1.2; return group(g); },
-        globe: () => { const e = sph(0.8, new THREE.MeshStandardMaterial({ map: earthTex, roughness: 0.5 }), [0, 1.0, 0]); e.rotation.z = 0.4; return group(e, cyl(0.3, 0.4, 0.12, M.darkMetal, [0, 0.06, 0])); },
+        // the Earth: a dark glass ball, the real continents (NASA land mask) glowing on it, a thin atmosphere and the
+        // 23.4 degree tilt. No stand: it floats like the planets in the Grouper reels.
+        globe: () => {
+          const land = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffffff, emissiveMap: earthMask, transparent: true });
+          land.userData.tint = PAL.accent[1];
+          const e = group(sph(0.8, M.glass, [0, 0, 0]), mesh(new THREE.SphereGeometry(0.805, 64, 48), land), mesh(new THREE.SphereGeometry(0.86, 48, 32), RIM(PAL.accent[0])));
+          e.rotation.z = 0.41; e.position.y = 1.0; return group(e);
+        },
         lock: () => group(rbox(0.9, 0.75, 0.32, 0.1, new THREE.MeshPhysicalMaterial({ color: 0xf2b632, roughness: 0.3, metalness: 0.45, clearcoat: 1, emissive: 0x4a3000, emissiveIntensity: 0.3 }), [0, 0.4, 0]), mesh(new THREE.TorusGeometry(0.28, 0.06, 16, 32, Math.PI), M.chrome, [0, 0.78, 0]),
           cyl(0.06, 0.06, 0.2, M.chrome, [-0.28, 0.82, 0]), cyl(0.06, 0.06, 0.2, M.chrome, [0.28, 0.82, 0]), cyl(0.06, 0.06, 0.04, M.black, [0, 0.42, 0.165], [Math.PI / 2, 0, 0])),
         charger: () => group(cyl(0.6, 0.62, 0.08, M.white, [0, 0.04, 0], [0, 0, 0], 64), mesh(new THREE.TorusGeometry(0.42, 0.015, 8, 64), glow('#22d3ee', 3), [0, 0.082, 0], [Math.PI / 2, 0, 0]),
           rbox(0.08, 0.04, 0.6, 0.02, M.white, [0, 0.02, 0.85])),
+        // a 330 ml drinks can (66 mm wide, 115 mm tall, 1 unit = 60 mm): the straight wall, the necked top and the rolled
+        // rim, the lid with its pull tab, and the domed bottom. No brand.
+        soda_can: () => {
+          const pts = [[0, 0], [0.42, 0.02], [0.52, 0.1], [0.55, 0.2], [0.55, 1.72], [0.5, 1.84], [0.45, 1.9], [0.46, 1.92], [0.44, 1.93], [0, 1.9]].map(([x, y]) => new THREE.Vector2(x, y));
+          const can = mesh(new THREE.LatheGeometry(pts, 64), M.alu);
+          return group(can, rbox(0.22, 0.012, 0.36, 0.05, M.chrome, [0, 1.925, 0.08]), cyl(0.06, 0.06, 0.01, M.darkMetal, [0, 1.92, -0.18]));
+        },
+        // a shipping box (40 x 30 x 30 cm, 1 unit = 25 cm): cardboard walls, the top flaps' seam and the tape across it.
+        cardboard_box: () => {
+          const card = new THREE.MeshStandardMaterial({ color: 0xb98a55, roughness: 0.9 }), tape = new THREE.MeshStandardMaterial({ color: 0xd9b27a, roughness: 0.4 });
+          return group(rbox(1.6, 1.2, 1.2, 0.02, card, [0, 0.6, 0]), rbox(1.62, 0.006, 0.01, 0.002, M.black, [0, 1.201, 0]),
+            rbox(0.24, 0.008, 1.22, 0.003, tape, [0, 1.204, 0]), rbox(0.24, 0.5, 0.008, 0.003, tape, [0, 0.95, 0.604]), rbox(0.24, 0.5, 0.008, 0.003, tape, [0, 0.95, -0.604]));
+        },
+        // DualSense style (160 x 106 x 66 mm, 1 unit = 100 mm): one moulded outline with the two grips flaring down,
+        // white shell, black centre, touchpad, light bar, two sticks, D-pad and four face buttons. No logos or symbols.
         controller: () => {
-          const body = plastic(PAL.accent[0]);
-          const g = group(rbox(1.3, 0.25, 0.6, 0.12, body, [0, 0.2, 0]), sph(0.32, body, [-0.55, 0.15, 0.15]), sph(0.32, body, [0.55, 0.15, 0.15]),
-            cyl(0.1, 0.1, 0.08, M.black, [-0.35, 0.35, 0.02]), cyl(0.1, 0.1, 0.08, M.black, [0.15, 0.35, 0.15]));
-          ['#ff453a', '#34c759', '#0a84ff', '#ffd60a'].forEach((c, k) => g.add(sph(0.045, plastic(c), [0.42 + 0.1 * Math.cos(k * Math.PI / 2), 0.36, -0.05 + 0.1 * Math.sin(k * Math.PI / 2)])));
-          g.rotation.x = -0.5; g.position.y = 0.2; return group(g);
+          const s = new THREE.Shape();
+          s.moveTo(-0.32, 0.42); s.lineTo(0.32, 0.42);
+          s.bezierCurveTo(0.6, 0.44, 0.78, 0.36, 0.8, 0.12);
+          s.bezierCurveTo(0.84, -0.18, 0.82, -0.52, 0.66, -0.64);
+          s.bezierCurveTo(0.54, -0.72, 0.42, -0.62, 0.36, -0.42);
+          s.bezierCurveTo(0.3, -0.24, 0.16, -0.2, 0, -0.2);
+          s.bezierCurveTo(-0.16, -0.2, -0.3, -0.24, -0.36, -0.42);
+          s.bezierCurveTo(-0.42, -0.62, -0.54, -0.72, -0.66, -0.64);
+          s.bezierCurveTo(-0.82, -0.52, -0.84, -0.18, -0.8, 0.12);
+          s.bezierCurveTo(-0.78, 0.36, -0.6, 0.44, -0.32, 0.42);
+          const shellGeo = new THREE.ExtrudeGeometry(s, { depth: 0.18, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.07, bevelSegments: 5, curveSegments: 24 });
+          shellGeo.translate(0, 0, -0.09);
+          const shell = new THREE.MeshPhysicalMaterial({ color: 0xf2f2f4, roughness: 0.45, clearcoat: 0.3 }), dark = new THREE.MeshStandardMaterial({ color: 0x1a1b20, roughness: 0.5 });
+          const g = group(mesh(shellGeo, shell));
+          g.add(slab(0.56, 0.3, 0.05, 0.06, 0.012, dark, [0, 0.2, 0.17]));                                 // touchpad
+          g.add(slab(0.46, 0.04, 0.02, 0.02, 0.005, glow(PAL.accent[1], 1.6), [0, 0.04, 0.165]));          // light bar
+          for (const x of [-0.24, 0.24]) g.add(cyl(0.085, 0.09, 0.06, dark, [x, -0.14, 0.2], [Math.PI / 2, 0, 0], 32), cyl(0.075, 0.075, 0.03, M.black, [x, -0.14, 0.24], [Math.PI / 2, 0, 0], 32));   // sticks
+          for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+            g.add(rbox(0.07, 0.07, 0.03, 0.015, dark, [-0.52 + dx * 0.075, 0.12 + dy * 0.075, 0.175]));    // D-pad
+            g.add(cyl(0.04, 0.04, 0.03, dark, [0.52 + dx * 0.085, 0.12 + dy * 0.085, 0.175], [Math.PI / 2, 0, 0], 24));   // face buttons
+          }
+          g.rotation.x = -0.95; g.position.y = 0.42; return group(g);
         },
         car: () => {
           const paint = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(PAL.accent[1]), metalness: 0.5, roughness: 0.25, clearcoat: 1 });
@@ -280,7 +415,7 @@
         base.position.copy(at); base.visible = ENV !== 'space'; world.add(base);   // nothing to stand on in orbit
         const obj = isSym ? SYM[kind](c) : OBJ[kind]();
         neonize(obj, c);
-        const holder = new THREE.Group(); holder.add(obj); holder.position.copy(at).add(V(0, isSym ? 1.35 : 0.22, 0)); world.add(holder);
+        const holder = new THREE.Group(); holder.add(obj); holder.position.copy(at).add(V(0, isSym ? 1.35 : 0.226, 0)); world.add(holder);
         const box = new THREE.Box3().setFromObject(holder), size = box.getSize(V()), h = Math.max(size.y, size.x * 0.8);
         const fit = isSym ? 1.3 / Math.max(size.x, size.y) : Math.min(1, 2.2 / Math.max(size.x, size.y));
         obj.scale.setScalar(fit);

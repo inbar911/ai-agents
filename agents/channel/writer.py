@@ -21,7 +21,7 @@ MODEL = "https://generativelanguage.googleapis.com/v1beta/models/{}:generateCont
 MODELS = ["gemini-2.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash"]
 
 # Must match OBJ, SYM and ACT in engine/world.js.
-OBJECTS = ["phone", "laptop", "router", "earbuds", "watch", "tv", "server", "chip", "tower", "satellite", "cloud", "globe",
+OBJECTS = ["phone", "phone_ultra", "laptop", "soda_can", "cardboard_box", "router", "earbuds", "watch", "tv", "server", "chip", "tower", "satellite", "cloud", "globe",
            "lock", "charger", "controller", "car", "house"]
 SYMBOLS = ["wifi", "bluetooth", "signal", "pin", "battery", "bell", "heart", "check", "cross", "bolt", "eye", "chat", "play",
            "gear", "shield", "fingerprint", "sound", "camera_icon"]

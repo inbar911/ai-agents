@@ -1,38 +1,4 @@
 {
- "smartphone_white": {
-  "tags": [
-   "phone",
-   "mobile",
-   "screen",
-   "app"
-  ],
-  "title": "Phone",
-  "by": "Quaternius",
-  "licence": "CC0 1.0",
-  "source": "https://poly.pizza/m/k2kgBepoMU"
- },
- "smartphone_black": {
-  "tags": [
-   "phone",
-   "mobile",
-   "screen"
-  ],
-  "title": "Smartphone",
-  "by": "smallbigsquare",
-  "licence": "CC0 1.0",
-  "source": "https://poly.pizza/m/4DRZmTs3jq"
- },
- "laptop_open": {
-  "tags": [
-   "laptop",
-   "computer",
-   "screen"
-  ],
-  "title": "Laptop",
-  "by": "Kenney",
-  "licence": "CC0 1.0",
-  "source": "https://poly.pizza/m/GnbwSUiVty"
- },
  "pc_tower": {
   "tags": [
    "computer",
@@ -54,18 +20,6 @@
   "by": "Kenney",
   "licence": "CC0 1.0",
   "source": "https://poly.pizza/m/V5Qo141OcB"
- },
- "server_tower": {
-  "tags": [
-   "server",
-   "data center",
-   "cloud",
-   "backend"
-  ],
-  "title": "Computer Large",
-  "by": "Quaternius",
-  "licence": "CC0 1.0",
-  "source": "https://poly.pizza/m/or4LLmesjq"
  },
  "monitor_wide": {
   "tags": [
@@ -952,17 +906,6 @@
   "licence": "CC0 1.0",
   "source": "https://poly.pizza/m/KpxDpidn1Z"
  },
- "soda_can": {
-  "tags": [
-   "soda",
-   "can",
-   "drink"
-  ],
-  "title": "Soda Can",
-  "by": "Kenney",
-  "licence": "CC0 1.0",
-  "source": "https://poly.pizza/m/KOLcdOATw6"
- },
  "backpack": {
   "tags": [
    "backpack",
@@ -1094,18 +1037,6 @@
   "by": "CreativeTrio",
   "licence": "CC0 1.0",
   "source": "https://poly.pizza/m/LVg3ynJDxa"
- },
- "cardboard_box": {
-  "tags": [
-   "box",
-   "package",
-   "delivery",
-   "order"
-  ],
-  "title": "Empty Box",
-  "by": "CreativeTrio",
-  "licence": "CC0 1.0",
-  "source": "https://poly.pizza/m/pZBpmjtvw8"
  },
  "chest": {
   "tags": [
