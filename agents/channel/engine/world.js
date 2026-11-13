@@ -35,6 +35,20 @@
       renderer.toneMapping = THREE.NoToneMapping;
       
       const world = new THREE.Scene();
+      // ─── lighting (13.11): real materials lit by a studio environment (a big top softbox, a lavender key, an accent rim
+      // and a dark floor), baked once with PMREM, so metal reflects, plastic has soft highlights and everything sits in
+      // the palette's light ───
+      {
+        const env = new THREE.Scene(), box = new THREE.BoxGeometry(1, 1, 1);
+        const panel = (c, k, at, sc) => { const m = new THREE.Mesh(box, new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), side: THREE.BackSide })); m.position.set(...at); m.scale.set(...sc); env.add(m); };
+        panel('#0b0a24', 1, [0, 0, 0], [30, 30, 30]);                       // the room: deep navy
+        panel('#ffffff', 2.0, [0, 9, 0], [10, 0.1, 10]);                     // top softbox
+        panel(PAL.accent[2] || '#c9c5ff', 2.2, [-9, 3, 6], [0.1, 6, 8]);     // key from the front left
+        panel(PAL.accent[0], 2.6, [9, 2, -6], [0.1, 6, 6]);                  // rim from behind right
+        panel('#05040f', 1, [0, -6, 0], [30, 0.1, 30]);                      // dark floor
+        const pm = new THREE.PMREMGenerator(renderer); world.environment = pm.fromScene(env, 0.04).texture; pm.dispose();
+        const key = new THREE.DirectionalLight(0xffffff, 0.7); key.position.set(-3, 6, 5); world.add(key);
+      }
       const cam = new THREE.PerspectiveCamera(36, W / H, 0.05, 200);
 
       // ─── the studio: a curved gradient backdrop, a soft floor, a key light with shadows ───
@@ -52,15 +66,17 @@
       const floorGrid = new THREE.LineSegments(gridGeo, new THREE.LineBasicMaterial(Object.assign({ color: PAL.grid, opacity: 0.22 }, ADD))); world.add(floorGrid);
 
       // ─── materials: every part keeps its real colour (13.11, see REAL below); glass is a see-through shell ───
-      const real = (hex, shell = false) => { const m = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.45, metalness: 0.2, transparent: shell, opacity: shell ? 0.25 : 1 }); m.userData.real = hex; m.userData.shell = shell; return m; };
+      const real = (hex, shell = false, pbr = {}) => { const m = new THREE.MeshStandardMaterial({ color: hex, roughness: pbr.rough ?? 0.45, metalness: pbr.metal ?? 0.05, transparent: !!shell, opacity: shell ? 0.25 : 1 }); m.userData.real = hex; m.userData.shell = shell; m.userData.pbr = pbr; return m; };
       const M = {
-        glass: real('#1d2330', true), titanium: real('#8e9097'), alu: real('#c3c7cd'), darkMetal: real('#3b4048'), white: real('#eceef1'),
-        black: real('#17191d'), gold: real('#c9962f'), chrome: real('#dfe3e8'), pcb: real('#0d6b35'), lens: real('#0b0d11'),
+        glass: real('#1d2330', true), titanium: real('#8e9097', false, { metal: 0.9, rough: 0.3 }), alu: real('#c3c7cd', false, { metal: 0.85, rough: 0.3 }),
+        darkMetal: real('#3b4048', false, { metal: 0.8, rough: 0.38 }), white: real('#eceef1', false, { rough: 0.35, coat: 0.5 }),
+        black: real('#17191d', false, { rough: 0.45 }), gold: real('#c9962f', false, { metal: 1, rough: 0.3 }), chrome: real('#dfe3e8', false, { metal: 1, rough: 0.1 }),
+        pcb: real('#0d6b35', false, { rough: 0.6 }), lens: real('#0b0d11', false, { metal: 0.3, rough: 0.05, coat: 1 }),
         tint: real('#0f1724', 0.58),   // tinted car glass: you see the seats, but it still reads as glass
       };
       const plastic = (c) => real(new THREE.Color(c).getHex());
       const glow = (c, i = 2) => new THREE.MeshStandardMaterial({ color: 0x000000, emissive: new THREE.Color(c), emissiveIntensity: i });
-      const screenMat = (t) => Object.assign(new THREE.MeshBasicMaterial({ map: t }), { userData: { decal: true } });   // a lit, opaque picture
+      const screenMat = (t) => Object.assign(new THREE.MeshBasicMaterial({ map: t, color: 0xc8c8c8 }), { userData: { decal: true } });   // a lit, opaque picture (a touch under full white, or the bloom turns it into a lamp)
       const mesh = (geo, mat, at = [0, 0, 0], rot = [0, 0, 0]) => { const m = new THREE.Mesh(geo, mat); m.position.set(...at); m.rotation.set(...rot); m.castShadow = true; m.receiveShadow = true; return m; };
       const rbox = (w, h, d, r, mat, at, rot) => mesh(new RoundedBoxGeometry(w, h, d, 4, Math.min(r, w / 2, h / 2, d / 2)), mat, at, rot);
       const cyl = (r1, r2, h, mat, at, rot, n = 32) => mesh(new THREE.CylinderGeometry(r1, r2, h, n), mat, at, rot);
@@ -100,6 +116,12 @@
       // printed text, silkscreen and labels: drawn on a transparent canvas and laid on a part as a decal (normal blending,
       // so dark ink on a silver lid stays dark)
       const ink = (w, h, paint) => { const m = new THREE.MeshBasicMaterial({ map: tex(w, h, paint), transparent: true, depthWrite: false }); m.userData.decal = true; return m; };
+      // the Grouper edge light on real materials: a thin fresnel rim in the palette's accent
+      const PBR_RIM = (sh) => {
+        sh.uniforms.rimC = { value: new THREE.Color(PAL.accent[1]) };
+        sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform vec3 rimC;\nvoid main() {')
+          .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  gl_FragColor.rgb += rimC * 0.22 * pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 3.0);');
+      };
       function neonize(root, c) {
         // additive glow stacks up: a dense model with many overlapping parts (a NASA rover) burns out to white, so dim it
         let tris = 0; root.traverse(o => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
@@ -113,7 +135,16 @@
           m.castShadow = m.receiveShadow = false;
           if (m.material.userData.decal) continue;
           if (m.material.userData.real) {
-            const sh = m.material.userData.shell; m.material = REAL(m.material.userData.real, sh, !!m.material.userData.vcol);
+            const sh = m.material.userData.shell;
+            if (!sh) {
+              const pb = m.material.userData.pbr || {};
+              m.material = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(m.material.userData.real), metalness: pb.metal ?? 0.05, roughness: pb.rough ?? 0.45,
+                clearcoat: pb.coat ?? 0.15, clearcoatRoughness: 0.2, vertexColors: !!m.material.userData.vcol });
+              m.material.onBeforeCompile = PBR_RIM;
+              m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 30), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.12, depthWrite: false })));
+              continue;
+            }
+            m.material = REAL(m.material.userData.real, sh, !!m.material.userData.vcol);
             if (!sh) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 30), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18, depthWrite: false })));
             else m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 25), edge));
             continue;
@@ -220,7 +251,7 @@
       // vehicles stand three-quarter on, nose to the camera, a little smaller than their 2 m length so they fit the 9:16 frame;
       // dress() turns them back square for parking along a street
       const hero = (g) => { g.rotation.y = -0.6; g.scale.setScalar(0.85); const o = group(g); o.userData.yawed = true; return o; };
-      const carPaint = (hex = '#1f4e9c') => real(hex);
+      const carPaint = (hex = '#1f4e9c') => real(hex, false, { metal: 0.45, rough: 0.3, coat: 1 });   // metallic paint under clearcoat
       const LAMP = '#f4f1ff', TAIL = '#ff3b4e';
       const FT = {};   // facade textures are shared: a city street dresses the same building many times
       const ftex = (key, cols, rows, kind, seed) => FT[key] || (FT[key] = tex(cols * 40, rows * 40, (x, w, h) => {
@@ -757,6 +788,7 @@
 
       // ─── one story world: each object the script names gets one place, and the story comes back to it (the router
       // stays the router, the phone stays the phone), so things can talk to each other across the scene ───
+      const SHADOW = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, map: tex(256, 256, (x, w) => { const g = x.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); g.addColorStop(0, 'rgba(0,0,0,0.75)'); g.addColorStop(0.6, 'rgba(0,0,0,0.35)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, w, w); }) });
       const RING = (c) => new THREE.MeshBasicMaterial(Object.assign({ color: new THREE.Color(c).multiplyScalar(PAL.glass ? 0.35 : 1) }, ADD));   // Grouper has no pedestals: just a faint floor ring
       const kindOf = k => (KINDS[k] ? k : 'phone');
       const kinds = [];
@@ -772,6 +804,9 @@
         const box = new THREE.Box3().setFromObject(holder), size = box.getSize(V()), h = Math.max(size.y, size.x * 0.8);
         const fit = isSym ? 1.3 / Math.max(size.x, size.y) : Math.min(1, 2.2 / Math.max(size.x, size.y));
         obj.scale.setScalar(fit);
+        if (!isSym && base.visible) {   // a soft contact shadow under the object, so it stands on the floor instead of floating
+          const sh = plane(Math.min(2.3, size.x * fit * 1.25), Math.min(2.3, size.z * fit * 1.25 + 0.3), SHADOW, [0, 0.224, 0], [-Math.PI / 2, 0, 0]); sh.castShadow = sh.receiveShadow = false; base.add(sh);
+        }
         holder.rotation.y = isSym ? 0 : (i % 2 ? -0.45 : 0.45);
         return { kind, isSym, holder, obj, at, c, fit, h: (isSym ? 1.3 : h * fit) + (isSym ? 1.35 : 0.22), base: holder.rotation.y };
       });
@@ -898,13 +933,17 @@
       const hits = SEGS.slice(1).map(s => { const plain = s.text.replace(/\*/g, ''), k = s.text.indexOf('*'); return k < 0 ? null : s.a + (s.b - s.a) * (k / Math.max(1, plain.length)) + 0.08; }).filter(x => x !== null);
       const kick = (t, at, rate) => (t >= at ? Math.exp(-(t - at) * rate) : 0);
       const SLAM = 0.2;   // the hook object lands at this second
+      // the hook keeps its push-in; an exploding object is circled so its layers turn in depth; a spinning one stays put
+      const MOVE = SEGS.map((s, i) => (i === 0 || s.action === 'spin' || s.action === 'beam' ? 'push' : s.action === 'explode' ? 'orbit' : ['dolly', 'orbit', 'crane'][i % 3]));
       // fast whip cuts between lines (viewers left a slow glide), a spring overshoot on arrival, a constant drift
       const camAt = t => {
         let i = 0; while (i + 1 < SEGS.length && t >= SEGS[i + 1].a - 0.22) i++;
         const k = keys[i], pv = keys[Math.max(0, i - 1)], f = i === 0 ? 1 : E.io3(seg(t, SEGS[i].a - 0.22, SEGS[i].a + 0.2));
         const u = t - SEGS[i].a, len = SEGS[i].end - SEGS[i].a;
-        const look = pv.look.clone().lerp(k.look, f), az = lerp(pv.az, k.az, f) + 0.1 * u, el = lerp(pv.el, k.el, f);
-        let dist = lerp(pv.dist, k.dist, f) * (1 - 0.12 * clamp(u / Math.max(1, len), 0, 1));
+        // each line gets its own move, like a camera operator: an orbit around the object, a dolly in, a crane up
+        const pr = E.io3(clamp(u / Math.max(1, len), 0, 1)), mv = MOVE[i];
+        const look = pv.look.clone().lerp(k.look, f), az = lerp(pv.az, k.az, f) + (mv === 'orbit' ? 0.55 * pr : 0.06 * u), el = lerp(pv.el, k.el, f) + (mv === 'crane' ? 0.24 * pr : 0);
+        let dist = lerp(pv.dist, k.dist, f) * (1 - (mv === 'dolly' ? 0.24 : mv === 'push' ? 0.12 : 0.05) * pr);
         if (i === 0) dist *= lerp(2.1, 1, sp(t, 0, 15, 0.42));
         else dist *= lerp(1.18, 1, sp(u, -0.05, 18, 0.45));
         for (const h of hits) dist *= 1 - 0.07 * kick(t, h, 7) * Math.min(1, (t - h) * 25);
@@ -941,7 +980,7 @@
         const m = OBJ[name](); neonize(m, PAL.accent[0]);
         if (m.userData.yawed) m.children[0].rotation.y = 0;
         const mats = new Set(); m.traverse(o => { if (o.material) mats.add(o.material); });   // parts share materials: dim each one once
-        for (const mt of mats) { if (mt.uniforms && mt.uniforms.c) mt.uniforms.c.value.multiplyScalar(0.6); if (mt.isLineBasicMaterial) mt.opacity *= 0.55; if (mt.isMeshBasicMaterial && mt.map) mt.opacity *= 0.5; }
+        for (const mt of mats) { if (mt.uniforms && mt.uniforms.c) mt.uniforms.c.value.multiplyScalar(0.6); if (mt.isMeshPhysicalMaterial) { mt.color.multiplyScalar(0.6); mt.envMapIntensity = 0.5; } if (mt.isLineBasicMaterial) mt.opacity *= 0.55; if (mt.isMeshBasicMaterial && mt.map) mt.opacity *= 0.5; }
         const box = new THREE.Box3().setFromObject(m), size = box.getSize(V());
         m.scale.setScalar(height / Math.max(size.y, 1e-6)); m.position.set(x, 0, z); m.rotation.y = rot; world.add(m); return m;
       };
