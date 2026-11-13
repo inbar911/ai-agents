@@ -1401,7 +1401,9 @@
     const last = SEGS[SEGS.length - 1], he = VIDEO.lang !== 'en';
     const fcap = caps.filter(c => c.a >= last.a - 0.01).find(c => /follow|תעקבו|עקבו/i.test(c.e.inner.textContent));
     // the card is up for the whole last line; the tap lands on the spoken word (its time from the transcript)
-    const tapAt = Math.min(DUR - 0.9, last.f ?? (fcap ? fcap.a : last.a + (last.b - last.a) * 0.6)), cardAt = Math.max(0, Math.min(last.a - 0.15, tapAt - 0.8));
+    // noFollow: model-library stills, where the card would sit on top of the model
+    const NOFOLLOW = !!VIDEO.noFollow;
+    const tapAt = NOFOLLOW ? 1e9 : Math.min(DUR - 0.9, last.f ?? (fcap ? fcap.a : last.a + (last.b - last.a) * 0.6)), cardAt = NOFOLLOW ? 1e9 : Math.max(0, Math.min(last.a - 0.15, tapAt - 0.8));
     const card = txt(root, '', { x: W / 2, y: 0.47 * H, size: 40, font: F.RUBIK, weight: 800, color: '#FFFFFF', dir: DIR,
       css: { background: 'rgba(18,18,28,0.92)', borderRadius: '36px', padding: '26px 30px', boxShadow: `0 20px 60px rgba(0,0,0,0.5), 0 0 40px ${PAL.accent[0]}55`, border: '2px solid rgba(255,255,255,0.12)', zoom: '1.3' } });
     card.inner.innerHTML = `<div style="display:flex;align-items:center;gap:26px;direction:ltr">
@@ -1415,7 +1417,7 @@
     hand.inner.innerHTML = '<svg width="110" height="140" viewBox="0 0 22 28"><path d="M2 1 L2 21 L7 16.5 L10.5 25 L14 23.5 L10.6 15.2 L17 15.2 Z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg>';
     const ripple = txt(root, '', { x: W / 2, y: 0.47 * H, size: 10, css: { width: '120px', height: '120px', borderRadius: '50%', border: '6px solid rgba(255,255,255,0.9)' } });
     let bx = null;   // the button's centre from the card's centre, measured once the card is laid out
-    sfx(cardAt, 'whoosh', 0.6); sfx(tapAt, 'click', 1.2); sfx(tapAt + 0.05, 'pop', 0.8); sfx(tapAt + 0.12, 'success', 0.9);
+    if (!NOFOLLOW) { sfx(cardAt, 'whoosh', 0.6); sfx(tapAt, 'click', 1.2); sfx(tapAt + 0.05, 'pop', 0.8); sfx(tapAt + 0.12, 'success', 0.9); }
     const COVER = !!window.COVER;
     const title = COVER ? txt(root, '', { x: W / 2, y: 0.68 * H, size: 120, font: F.RUBIK, weight: 900, color: '#FFFFFF', dir: DIR,
       css: { whiteSpace: 'normal', width: '900px', textAlign: 'center', lineHeight: 1.08, textShadow: `0 0 40px ${PAL.accent[0]}, 0 6px 0 #000` } }) : null;
