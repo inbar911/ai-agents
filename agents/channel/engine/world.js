@@ -51,22 +51,16 @@
       const gridGeo = new THREE.BufferGeometry(); gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(gridPts, 3));
       const floorGrid = new THREE.LineSegments(gridGeo, new THREE.LineBasicMaterial(Object.assign({ color: PAL.grid, opacity: 0.22 }, ADD))); world.add(floorGrid);
 
-      // ─── materials ───
+      // ─── materials: every part keeps its real colour (13.11, see REAL below); glass is a see-through shell ───
+      const real = (hex, shell = false) => { const m = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.45, metalness: 0.2, transparent: shell, opacity: shell ? 0.25 : 1 }); m.userData.real = hex; m.userData.shell = shell; return m; };
       const M = {
-        glass: new THREE.MeshPhysicalMaterial({ color: 0x0b0d12, roughness: 0.05, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.03 }),
-        titanium: new THREE.MeshStandardMaterial({ color: 0x8a8f98, roughness: 0.28, metalness: 0.95 }),
-        alu: new THREE.MeshStandardMaterial({ color: 0xc9ccd2, roughness: 0.32, metalness: 0.9 }),
-        darkMetal: new THREE.MeshStandardMaterial({ color: 0x2b2f36, roughness: 0.35, metalness: 0.85 }),
-        white: new THREE.MeshPhysicalMaterial({ color: 0xf7f7f5, roughness: 0.25, clearcoat: 0.6, clearcoatRoughness: 0.2 }),
-        black: new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.4, metalness: 0.2 }),
-        gold: new THREE.MeshStandardMaterial({ color: 0xd4a23a, roughness: 0.3, metalness: 1 }),
-        chrome: new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.08, metalness: 1 }),
-        pcb: new THREE.MeshStandardMaterial({ color: 0x0f6b3a, roughness: 0.6, metalness: 0.1 }),
-        lens: new THREE.MeshPhysicalMaterial({ color: 0x05070a, roughness: 0.02, metalness: 0.4, clearcoat: 1 }),
+        glass: real('#1d2330', true), titanium: real('#8e9097'), alu: real('#c3c7cd'), darkMetal: real('#3b4048'), white: real('#eceef1'),
+        black: real('#17191d'), gold: real('#c9962f'), chrome: real('#dfe3e8'), pcb: real('#0d6b35'), lens: real('#0b0d11'),
+        tint: real('#0f1724', 0.58),   // tinted car glass: you see the seats, but it still reads as glass
       };
-      const plastic = (c) => new THREE.MeshPhysicalMaterial({ color: new THREE.Color(c), roughness: 0.3, clearcoat: 0.7, clearcoatRoughness: 0.15 });
+      const plastic = (c) => real(new THREE.Color(c).getHex());
       const glow = (c, i = 2) => new THREE.MeshStandardMaterial({ color: 0x000000, emissive: new THREE.Color(c), emissiveIntensity: i });
-      const screenMat = (t) => new THREE.MeshStandardMaterial({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.85, roughness: 0.15 });
+      const screenMat = (t) => Object.assign(new THREE.MeshBasicMaterial({ map: t }), { userData: { decal: true } });   // a lit, opaque picture
       const mesh = (geo, mat, at = [0, 0, 0], rot = [0, 0, 0]) => { const m = new THREE.Mesh(geo, mat); m.position.set(...at); m.rotation.set(...rot); m.castShadow = true; m.receiveShadow = true; return m; };
       const rbox = (w, h, d, r, mat, at, rot) => mesh(new RoundedBoxGeometry(w, h, d, 4, Math.min(r, w / 2, h / 2, d / 2)), mat, at, rot);
       const cyl = (r1, r2, h, mat, at, rot, n = 32) => mesh(new THREE.CylinderGeometry(r1, r2, h, n), mat, at, rot);
@@ -95,15 +89,14 @@
       // real colours inside the Grouper look (13.11, pilot): a part made with real(hex) keeps its colour, lit by a soft key
       // light with the palette's rim on its edges; real(hex, true) is a see-through shell (a truck's body, a phone's back
       // glass) so what's inside shows. Everything else stays the one-hue glass.
-      const VSN = 'varying vec3 n; varying vec3 v; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); n = normalize(normalMatrix * normal); v = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }';
-      const REAL = (c, shell) => new THREE.ShaderMaterial({
-        uniforms: { c: { value: new THREE.Color(c) }, rim: { value: new THREE.Color(PAL.accent[1]) } },
-        transparent: shell, depthWrite: !shell, side: shell ? THREE.DoubleSide : THREE.FrontSide, vertexShader: VSN,
+      const VSN = 'varying vec3 n; varying vec3 v; varying vec3 vc; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); n = normalize(normalMatrix * normal); v = normalize(-mv.xyz); \n#ifdef USE_COLOR\n vc = color; \n#else\n vc = vec3(1.0); \n#endif\n gl_Position = projectionMatrix * mv; }';
+      const REAL = (c, shell, vcol = false) => new THREE.ShaderMaterial({ vertexColors: vcol,
+        uniforms: { c: { value: new THREE.Color(c) }, rim: { value: new THREE.Color(PAL.accent[1]) }, a: { value: typeof shell === 'number' ? shell : 0.1 } },
+        transparent: !!shell, depthWrite: !shell, side: shell ? THREE.DoubleSide : THREE.FrontSide, vertexShader: VSN,
         fragmentShader: shell
-          ? 'uniform vec3 c; uniform vec3 rim; varying vec3 n; varying vec3 v; void main(){ float r = pow(1.0 - abs(dot(normalize(n), normalize(v))), 2.4); gl_FragColor = vec4(mix(c * 0.45, mix(c, rim, 0.3), r), 0.1 + 0.5 * r); }'
-          : 'uniform vec3 c; uniform vec3 rim; varying vec3 n; varying vec3 v; void main(){ vec3 N = normalize(n); float d = abs(dot(N, normalize(v))); float key = max(dot(N, normalize(vec3(0.35, 0.85, 0.4))), 0.0); float r = pow(1.0 - d, 3.0); gl_FragColor = vec4(c * (0.3 + 0.55 * key + 0.2 * d) + rim * 0.3 * r, 1.0); }',
+          ? 'uniform vec3 c; uniform vec3 rim; uniform float a; varying vec3 n; varying vec3 v; varying vec3 vc; void main(){ float r = pow(1.0 - abs(dot(normalize(n), normalize(v))), 2.4); gl_FragColor = vec4(mix(c * 0.45, mix(c, rim, 0.3), r), a + 0.5 * r); }'
+          : 'uniform vec3 c; uniform vec3 rim; varying vec3 n; varying vec3 v; varying vec3 vc; void main(){ vec3 N = normalize(n); float d = abs(dot(N, normalize(v))); float key = max(dot(N, normalize(vec3(0.35, 0.85, 0.4))), 0.0); float r = pow(1.0 - d, 3.0); gl_FragColor = vec4(c * vc * (0.3 + 0.55 * key + 0.2 * d) + rim * 0.3 * r, 1.0); }',
       });
-      const real = (hex, shell = false) => { const m = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.45, metalness: 0.2, transparent: shell, opacity: shell ? 0.25 : 1 }); m.userData.real = hex; m.userData.shell = shell; return m; };
       // printed text, silkscreen and labels: drawn on a transparent canvas and laid on a part as a decal (normal blending,
       // so dark ink on a silver lid stays dark)
       const ink = (w, h, paint) => { const m = new THREE.MeshBasicMaterial({ map: tex(w, h, paint), transparent: true, depthWrite: false }); m.userData.decal = true; return m; };
@@ -120,7 +113,7 @@
           m.castShadow = m.receiveShadow = false;
           if (m.material.userData.decal) continue;
           if (m.material.userData.real) {
-            const sh = m.material.userData.shell; m.material = REAL(m.material.userData.real, sh);
+            const sh = m.material.userData.shell; m.material = REAL(m.material.userData.real, sh, !!m.material.userData.vcol);
             if (!sh) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 30), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18, depthWrite: false })));
             else m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 25), edge));
             continue;
@@ -150,24 +143,24 @@
         x.fillStyle = 'rgba(255,255,255,0.3)'; roundRect(x, 28, h - 170, w - 56, 130, 44);   // dock
         for (let k = 0; k < 4; k++) { x.fillStyle = APP[(k * 3 + 1) % APP.length]; roundRect(x, 56 + k * 112, h - 147, 84, 84, 22); }
       });
-      const phoneScreen = phoneScreenOf(false), phoneScreenUltra = phoneScreenOf(true), phoneScreenReal = phoneScreenOf(false, true);
+      const phoneScreen = phoneScreenOf(false), phoneScreenUltra = phoneScreenOf(true, true), phoneScreenReal = phoneScreenOf(false, true);
       const laptopScreen = tex(1024, 640, (x, w, h) => {
         x.fillStyle = '#f2f4f8'; x.fillRect(0, 0, w, h);
         x.fillStyle = '#d9dde5'; x.fillRect(0, 0, w, 54); ['#ff5f57', '#febc2e', '#28c840'].forEach((c, k) => { x.fillStyle = c; x.beginPath(); x.arc(30 + k * 32, 27, 10, 0, 7); x.fill(); });
         x.fillStyle = '#fff'; roundRect(x, 160, 12, 700, 30, 15);
-        x.fillStyle = PAL.accent[0]; roundRect(x, 60, 100, 560, 70, 14);
+        x.fillStyle = '#0a84ff'; roundRect(x, 60, 100, 560, 70, 14);
         x.fillStyle = '#c9ced8'; for (let k = 0; k < 6; k++) roundRect(x, 60, 200 + k * 50, 300 + 200 * hash(k), 22, 11);
-        x.fillStyle = PAL.accent[1]; roundRect(x, 680, 100, 280, 280, 20);
+        x.fillStyle = '#ff9f0a'; roundRect(x, 680, 100, 280, 280, 20);
       });
       const watchFace = tex(256, 300, (x, w, h) => {
         x.fillStyle = '#000'; x.fillRect(0, 0, w, h);
-        [[PAL.accent[1], 100], [PAL.accent[3], 78], [PAL.accent[0], 56]].forEach(([c, r], k) => { x.strokeStyle = c; x.lineWidth = 18; x.lineCap = 'round'; x.beginPath(); x.arc(w / 2, h / 2, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * (1.2 + 0.25 * k)); x.stroke(); });
+        [['#fa114f', 100], ['#a6ff00', 78], ['#00d8ff', 56]].forEach(([c, r], k) => { x.strokeStyle = c; x.lineWidth = 18; x.lineCap = 'round'; x.beginPath(); x.arc(w / 2, h / 2, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * (1.2 + 0.25 * k)); x.stroke(); });
         x.fillStyle = '#fff'; x.font = '700 40px Rubik'; x.textAlign = 'center'; x.fillText('10:09', w / 2, h / 2 + 14);
       });
       const tvScreen = tex(1024, 576, (x, w, h) => {
-        const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, PAL.glass ? '#2a2670' : '#5ac8fa'); g.addColorStop(1, PAL.glass ? '#8c86f0' : '#ffe29a'); x.fillStyle = g; x.fillRect(0, 0, w, h);
-        x.fillStyle = PAL.glass ? '#e6e3ff' : '#ffcc00'; x.beginPath(); x.arc(780, 160, 70, 0, 7); x.fill();
-        x.fillStyle = PAL.glass ? '#5b55c9' : '#34c759'; x.beginPath(); x.moveTo(0, h); x.lineTo(300, 300); x.lineTo(560, h); x.fill(); x.fillStyle = PAL.glass ? '#4a44b0' : '#30a14e'; x.beginPath(); x.moveTo(360, h); x.lineTo(700, 260); x.lineTo(1024, h); x.fill();
+        const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#5ac8fa'); g.addColorStop(1, '#ffe29a'); x.fillStyle = g; x.fillRect(0, 0, w, h);
+        x.fillStyle = '#ffcc00'; x.beginPath(); x.arc(780, 160, 70, 0, 7); x.fill();
+        x.fillStyle = '#34c759'; x.beginPath(); x.moveTo(0, h); x.lineTo(300, 300); x.lineTo(560, h); x.fill(); x.fillStyle = '#30a14e'; x.beginPath(); x.moveTo(360, h); x.lineTo(700, 260); x.lineTo(1024, h); x.fill();
       });
       const earthTex = tex(1024, 512, (x, w, h) => {
         x.fillStyle = '#1e6fd9'; x.fillRect(0, 0, w, h);
@@ -227,7 +220,7 @@
       // vehicles stand three-quarter on, nose to the camera, a little smaller than their 2 m length so they fit the 9:16 frame;
       // dress() turns them back square for parking along a street
       const hero = (g) => { g.rotation.y = -0.6; g.scale.setScalar(0.85); const o = group(g); o.userData.yawed = true; return o; };
-      const carPaint = () => new THREE.MeshPhysicalMaterial({ color: new THREE.Color(PAL.accent[1]), metalness: 0.5, roughness: 0.25, clearcoat: 1 });
+      const carPaint = (hex = '#1f4e9c') => real(hex);
       const LAMP = '#f4f1ff', TAIL = '#ff3b4e';
       const FT = {};   // facade textures are shared: a city street dresses the same building many times
       const ftex = (key, cols, rows, kind, seed) => FT[key] || (FT[key] = tex(cols * 40, rows * 40, (x, w, h) => {
@@ -249,14 +242,24 @@
       };
       const winFrame = (x, y, z, w, h, lit) => group(rbox(w + 0.03, h + 0.03, 0.012, 0.004, M.white, [x, y, z]), rbox(w, h, 0.016, 0.003, lit ? glow('#e2deff', 1.1) : M.lens, [x, y, z + 0.003]),
         rbox(0.01, h, 0.02, 0.002, M.white, [x, y, z + 0.005]), rbox(w, 0.01, 0.02, 0.002, M.white, [x, y, z + 0.005]));
+      // what you see through a vehicle's windows: seats with headrests (front pair, rear bench or none), the steering wheel
+      // on its column, the dashboard with a lit centre screen
+      const interior = (g, { seatY, front, rear = null, steer, dash, width, seat = '#2b2f36' }) => {
+        const sm = real(seat), dark = real('#1c1f24');
+        for (const z of [width * 0.24, -width * 0.24]) g.add(rbox(0.15, 0.04, 0.15, 0.015, sm, [front, seatY, z]), rbox(0.04, 0.17, 0.15, 0.015, sm, [front - 0.08, seatY + 0.09, z], [0, 0, 0.15]), rbox(0.03, 0.05, 0.09, 0.012, sm, [front - 0.1, seatY + 0.2, z]));
+        if (rear !== null) g.add(rbox(0.15, 0.04, width * 0.75, 0.015, sm, [rear, seatY, 0]), rbox(0.04, 0.16, width * 0.75, 0.015, sm, [rear - 0.08, seatY + 0.09, 0], [0, 0, 0.18]));
+        const ring = mesh(new THREE.TorusGeometry(0.05, 0.008, 8, 28), dark, [steer[0], steer[1], width * 0.24], [0, Math.PI / 2, 0]); ring.rotation.z = 0.45; g.add(ring);
+        g.add(cyl(0.007, 0.007, 0.1, dark, [steer[0] + 0.05, steer[1] - 0.03, width * 0.24], [0, 0, 1.1], 8));
+        g.add(rbox(0.07, 0.045, width * 0.9, 0.015, dark, [dash[0], dash[1], 0]), plane(0.13, 0.08, screenMat(tvScreen), [dash[0] - 0.036, dash[1] + 0.035, 0], [0, -Math.PI / 2, 0]));
+      };
       // a sedan in the proportions of a Model 3 class car (4720 x 1850 x 1441 mm, 1 unit = 2.4 m): fastback roof, flush
       // handles, a full-width tail light bar. No logos.
       const sedan = () => {
-        const R = 0.142, paint = carPaint();
+        const R = 0.142, paint = carPaint('#1f4e9c');
         const g = group(
           extrudeZ(prof([[-0.93, 0.10], ['a', -0.58, R, 0.21, 0.10], ['a', 0.62, R, 0.21, 0.10], [0.92, 0.10], ['q', 0.95, 0.12, 0.95, 0.20], ['q', 0.95, 0.27, 0.90, 0.29],
             ['q', 0.62, 0.33, 0.32, 0.385], [-0.62, 0.40], ['q', -0.86, 0.405, -0.93, 0.36], ['q', -0.955, 0.30, -0.945, 0.20], ['q', -0.945, 0.12, -0.93, 0.10]]), 0.77, 0.04, paint),
-          extrudeZ(prof([[0.30, 0.37], ['q', 0.17, 0.50, 0.04, 0.55], ['q', -0.15, 0.565, -0.34, 0.545], ['q', -0.62, 0.48, -0.80, 0.39], [-0.80, 0.37]]), 0.64, 0.05, M.glass));
+          extrudeZ(prof([[0.30, 0.37], ['q', 0.17, 0.50, 0.04, 0.55], ['q', -0.15, 0.565, -0.34, 0.545], ['q', -0.62, 0.48, -0.80, 0.39], [-0.80, 0.37]]), 0.64, 0.05, M.tint));
         for (const s of [1, -1]) {
           g.add(sideFlat([[0.25, 0.40], ['q', 0.15, 0.49, 0.04, 0.525], [-0.13, 0.53], [-0.13, 0.40]], s * 0.322, M.lens),
             sideFlat([[-0.16, 0.40], [-0.16, 0.53], ['q', -0.36, 0.53, -0.50, 0.49], ['q', -0.62, 0.44, -0.68, 0.40]], s * 0.322, M.lens));
@@ -266,6 +269,7 @@
           g.add(wheel(R, 0.09, [0.62, R, s * 0.33]), wheel(R, 0.09, [-0.58, R, s * 0.33]));
         }
         g.add(rbox(0.02, 0.05, 0.42, 0.01, M.black, [0.985, 0.15, 0]), rbox(0.02, 0.025, 0.68, 0.01, glow(TAIL, 2), [-0.975, 0.335, 0]));
+        interior(g, { seatY: 0.33, front: 0.04, rear: -0.36, steer: [0.2, 0.45], dash: [0.3, 0.41], width: 0.62, seat: '#cdbfa6' });
         return g;
       };
       // a 3- to 4-storey city block of the classic kind: a lit shop floor with awnings, punched windows with sills, a cornice
@@ -459,11 +463,11 @@
         // 23.4 degree tilt. No stand: it floats like the planets in the Grouper reels.
         globe: () => {
           const land = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffffff, emissiveMap: earthMask, transparent: true });
-          land.userData.tint = PAL.accent[1];
-          const e = group(sph(0.8, M.glass, [0, 0, 0]), mesh(new THREE.SphereGeometry(0.805, 64, 48), land), mesh(new THREE.SphereGeometry(0.86, 48, 32), RIM(PAL.accent[0])));
+          land.userData.tint = '#4fbf5f';
+          const e = group(sph(0.8, real('#1e4fa8'), [0, 0, 0]), mesh(new THREE.SphereGeometry(0.805, 64, 48), land), mesh(new THREE.SphereGeometry(0.86, 48, 32), RIM(PAL.accent[0])));
           e.rotation.z = 0.41; e.position.y = 1.0; return group(e);
         },
-        lock: () => group(rbox(0.9, 0.75, 0.32, 0.1, new THREE.MeshPhysicalMaterial({ color: 0xf2b632, roughness: 0.3, metalness: 0.45, clearcoat: 1, emissive: 0x4a3000, emissiveIntensity: 0.3 }), [0, 0.4, 0]), mesh(new THREE.TorusGeometry(0.28, 0.06, 16, 32, Math.PI), M.chrome, [0, 0.78, 0]),
+        lock: () => group(rbox(0.9, 0.75, 0.32, 0.1, real('#d9a52e'), [0, 0.4, 0]), mesh(new THREE.TorusGeometry(0.28, 0.06, 16, 32, Math.PI), M.chrome, [0, 0.78, 0]),
           cyl(0.06, 0.06, 0.2, M.chrome, [-0.28, 0.82, 0]), cyl(0.06, 0.06, 0.2, M.chrome, [0.28, 0.82, 0]), cyl(0.06, 0.06, 0.04, M.black, [0, 0.42, 0.165], [Math.PI / 2, 0, 0])),
         charger: () => group(cyl(0.6, 0.62, 0.08, M.white, [0, 0.04, 0], [0, 0, 0], 64), mesh(new THREE.TorusGeometry(0.42, 0.015, 8, 64), glow('#22d3ee', 3), [0, 0.082, 0], [Math.PI / 2, 0, 0]),
           rbox(0.08, 0.04, 0.6, 0.02, M.white, [0, 0.02, 0.85])),
@@ -471,12 +475,17 @@
         // rim, the lid with its pull tab, and the domed bottom. No brand.
         soda_can: () => {
           const pts = [[0, 0], [0.42, 0.02], [0.52, 0.1], [0.55, 0.2], [0.55, 1.72], [0.5, 1.84], [0.45, 1.9], [0.46, 1.92], [0.44, 1.93], [0, 1.9]].map(([x, y]) => new THREE.Vector2(x, y));
+          const label = tex(1024, 512, (x, w, h) => {
+            x.fillStyle = '#c8102e'; x.fillRect(0, 0, w, h); x.fillStyle = '#ffffff'; x.font = '900 150px Rubik'; x.textAlign = 'center'; x.fillText('FIZZ', w / 2, 270);
+            x.font = '600 44px Rubik'; x.fillText('ORIGINAL · 330 ml', w / 2, 360); x.fillStyle = 'rgba(120,10,25,0.9)'; x.fillRect(0, 60, w, 8); x.fillRect(0, h - 68, w, 8);
+          });
           const can = mesh(new THREE.LatheGeometry(pts, 64), M.alu);
-          return group(can, rbox(0.22, 0.012, 0.36, 0.05, M.chrome, [0, 1.925, 0.08]), cyl(0.06, 0.06, 0.01, M.darkMetal, [0, 1.92, -0.18]));
+          const wrap = mesh(new THREE.CylinderGeometry(0.556, 0.556, 1.4, 64, 1, true), Object.assign(new THREE.MeshBasicMaterial({ map: label }), { userData: { decal: true } }), [0, 0.95, 0], [0, Math.PI, 0]);   // the brand faces the camera
+          return group(can, wrap, rbox(0.22, 0.012, 0.36, 0.05, M.chrome, [0, 1.925, 0.08]), cyl(0.06, 0.06, 0.01, M.darkMetal, [0, 1.92, -0.18]));
         },
         // a shipping box (40 x 30 x 30 cm, 1 unit = 25 cm): cardboard walls, the top flaps' seam and the tape across it.
         cardboard_box: () => {
-          const card = new THREE.MeshStandardMaterial({ color: 0xb98a55, roughness: 0.9 }), tape = new THREE.MeshStandardMaterial({ color: 0xd9b27a, roughness: 0.4 });
+          const card = real('#b98a55'), tape = real('#e0c48f');
           return group(rbox(1.6, 1.2, 1.2, 0.02, card, [0, 0.6, 0]), rbox(1.62, 0.006, 0.01, 0.002, M.black, [0, 1.201, 0]),
             rbox(0.24, 0.008, 1.22, 0.003, tape, [0, 1.204, 0]), rbox(0.24, 0.5, 0.008, 0.003, tape, [0, 0.95, 0.604]), rbox(0.24, 0.5, 0.008, 0.003, tape, [0, 0.95, -0.604]));
         },
@@ -495,7 +504,7 @@
           s.bezierCurveTo(-0.78, 0.36, -0.6, 0.44, -0.32, 0.42);
           const shellGeo = new THREE.ExtrudeGeometry(s, { depth: 0.18, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.07, bevelSegments: 5, curveSegments: 24 });
           shellGeo.translate(0, 0, -0.09);
-          const shell = new THREE.MeshPhysicalMaterial({ color: 0xf2f2f4, roughness: 0.45, clearcoat: 0.3 }), dark = new THREE.MeshStandardMaterial({ color: 0x1a1b20, roughness: 0.5 });
+          const shell = real('#f0f1f3'), dark = real('#1c1d22');
           const g = group(mesh(shellGeo, shell));
           g.add(slab(0.56, 0.3, 0.05, 0.06, 0.012, dark, [0, 0.2, 0.17]));                                 // touchpad
           g.add(slab(0.46, 0.04, 0.02, 0.02, 0.005, glow(PAL.accent[1], 1.6), [0, 0.04, 0.165]));          // light bar
@@ -516,11 +525,11 @@
         // a rear-engined sports coupe (4519 x 1852 x 1298 mm, 1 unit = 2.3 m): long sloping roofline, oval lamps, big wheels, a
         // ducktail spoiler. No logos.
         sports_car: () => {
-          const R = 0.152, paint = carPaint();
+          const R = 0.152, paint = carPaint('#c81e1e');
           const g = group(
             extrudeZ(prof([[-0.90, 0.09], ['a', -0.515, R, 0.225, 0.09], ['a', 0.55, R, 0.225, 0.09], [0.90, 0.09], ['q', 0.94, 0.10, 0.94, 0.17], ['q', 0.93, 0.23, 0.85, 0.25],
               ['q', 0.55, 0.30, 0.25, 0.34], [-0.35, 0.35], ['q', -0.80, 0.33, -0.92, 0.24], ['q', -0.945, 0.15, -0.90, 0.09]]), 0.80, 0.05, paint),
-            extrudeZ(prof([[0.27, 0.32], ['q', 0.10, 0.46, -0.05, 0.49], ['q', -0.25, 0.51, -0.42, 0.46], ['q', -0.70, 0.36, -0.86, 0.27], [-0.40, 0.30]]), 0.62, 0.05, M.glass),
+            extrudeZ(prof([[0.27, 0.32], ['q', 0.10, 0.46, -0.05, 0.49], ['q', -0.25, 0.51, -0.42, 0.46], ['q', -0.70, 0.36, -0.86, 0.27], [-0.40, 0.30]]), 0.62, 0.05, M.tint),
             rbox(0.08, 0.012, 0.66, 0.004, paint, [-0.9, 0.335, 0], [0, 0, 0.25]), rbox(0.02, 0.025, 0.7, 0.01, glow(TAIL, 2), [-0.94, 0.27, 0]),
             rbox(0.02, 0.05, 0.5, 0.01, M.black, [0.94, 0.13, 0]));
           for (const s of [1, -1]) {
@@ -529,15 +538,16 @@
             const lamp = mesh(new THREE.SphereGeometry(0.06, 24, 16), glow(LAMP, 2.2), [0.86, 0.26, s * 0.27]); lamp.scale.set(0.6, 0.8, 1); g.add(lamp);
             g.add(rbox(0.05, 0.035, 0.07, 0.012, M.black, [0.2, 0.37, s * 0.41]), wheel(R, 0.1, [0.55, R, s * 0.34]), wheel(R, 0.11, [-0.515, R, s * 0.34]));
           }
+          interior(g, { seatY: 0.27, front: -0.02, steer: [0.15, 0.37], dash: [0.24, 0.34], width: 0.6, seat: '#1f2126' });
           return hero(g);
         },
         // a full-size crew-cab pickup (5890 x 2030 x 1960 mm, 1 unit = 2.95 m): tall square nose, big grille, an open bed with
         // the wheel wells inside it, 33-inch tyres. No logos.
         pickup_truck: () => {
-          const R = 0.142, paint = carPaint();
+          const R = 0.142, paint = carPaint('#5b6573');
           const g = group(
             extrudeZ(prof([[-0.95, 0.16], ['a', -0.57, R, 0.185, 0.16], ['a', 0.68, R, 0.185, 0.16], [0.955, 0.16], [0.955, 0.43], ['q', 0.70, 0.445, 0.40, 0.445], [-0.27, 0.445], [-0.27, 0.35], [-0.95, 0.35]]), 0.69, 0.02, paint),
-            extrudeZ(prof([[0.40, 0.42], [0.21, 0.635], [-0.25, 0.64], [-0.25, 0.42]]), 0.66, 0.03, M.glass),
+            extrudeZ(prof([[0.40, 0.42], [0.21, 0.635], [-0.25, 0.64], [-0.25, 0.42]]), 0.66, 0.03, M.tint),
             rbox(0.03, 0.12, 0.69, 0.01, paint, [-0.955, 0.42, 0]),
             rbox(0.02, 0.2, 0.56, 0.01, M.darkMetal, [0.98, 0.33, 0]), rbox(0.05, 0.07, 0.72, 0.02, M.chrome, [0.985, 0.19, 0]), rbox(0.05, 0.06, 0.7, 0.02, M.chrome, [-0.975, 0.2, 0]));
           for (const y of [0.27, 0.33, 0.39]) g.add(rbox(0.012, 0.012, 0.54, 0.004, M.chrome, [0.992, y, 0]));
@@ -548,6 +558,7 @@
             g.add(rbox(0.02, 0.05, 0.1, 0.01, glow(LAMP, 2.5), [0.985, 0.40, s * 0.27]), rbox(0.02, 0.1, 0.03, 0.008, glow(TAIL, 2), [-0.975, 0.41, s * 0.32]),
               rbox(0.05, 0.07, 0.06, 0.015, M.black, [0.33, 0.5, s * 0.38]), wheel(R, 0.1, [0.68, R, s * 0.30], 6), wheel(R, 0.1, [-0.57, R, s * 0.30], 6));
           }
+          interior(g, { seatY: 0.45, front: 0.12, rear: -0.17, steer: [0.3, 0.54], dash: [0.36, 0.5], width: 0.6, seat: '#4a4f57' });
           return hero(g);
         },
         // a cab-over box truck (6600 x 2300 x 3400 mm, 1 unit = 3.4 m) in real colours, see-through (13.11 pilot): white
@@ -609,7 +620,7 @@
         // a long-hood sleeper tractor (7500 x 2600 x 4100 mm, 1 unit = 3.9 m): sloped hood, raised-roof sleeper, chrome grille,
         // bumper, fuel tanks and exhaust stacks, tandem drive axles with duals, the fifth wheel. No logos.
         semi_truck: () => {
-          const R = 0.133, paint = carPaint();
+          const R = 0.133, paint = carPaint('#1d3f91');
           const g = group(
             extrudeZ(prof([[0.32, 0.22], [0.94, 0.22], [0.945, 0.40], ['q', 0.945, 0.43, 0.90, 0.44], [0.40, 0.52], [0.32, 0.52]]), 0.52, 0.03, paint),
             extrudeZ(prof([[0.34, 0.20], [0.34, 0.50], [0.22, 0.76], ['q', 0.15, 0.795, 0.04, 0.80], ['q', -0.08, 0.81, -0.17, 0.97], [-0.42, 0.99], [-0.43, 0.20]]), 0.67, 0.03, paint),
@@ -627,6 +638,8 @@
             g.add(wheel(R, 0.08, [0.70, R, s * 0.29], 8));
             for (const x of [-0.45, -0.78]) g.add(wheel(R, 0.06, [x, R, s * 0.30], 8), wheel(R, 0.06, [x, R, s * 0.235], 8));
           }
+          interior(g, { seatY: 0.46, front: 0.12, steer: [0.25, 0.57], dash: [0.3, 0.52], width: 0.62, seat: '#3a3f47' });
+          g.add(rbox(0.22, 0.05, 0.58, 0.02, real('#2f4a7a'), [-0.3, 0.42, 0]), rbox(0.22, 0.05, 0.58, 0.02, real('#2f4a7a'), [-0.3, 0.74, 0]), rbox(0.04, 0.02, 0.58, 0.005, real('#8d939c'), [-0.2, 0.77, 0]));   // sleeper bunks
           return hero(g);
         },
         // a ~300 m office supertall (1 unit = 150 m): podium, three setback tiers in a glass curtain wall, a crown and spire
@@ -638,7 +651,8 @@
         // a twisting glass tower: 36 floor plates, each turned 1.4 degrees on the one below (90 degrees over the height)
         glass_skyscraper: () => {
           const g = group();
-          for (let k = 0; k < 36; k++) { const f = group(mesh(new THREE.BoxGeometry(0.44, 0.042, 0.30), M.glass), rbox(0.46, 0.008, 0.32, 0.003, M.white, [0, 0.025, 0])); f.position.y = 0.05 + k * 0.05; f.rotation.y = k * 0.025; g.add(f); }
+          const glassB = real('#3d6aa6', true), plate = real('#8f98a6');
+          for (let k = 0; k < 36; k++) { const f = group(mesh(new THREE.BoxGeometry(0.44, 0.042, 0.30), glassB), rbox(0.46, 0.008, 0.32, 0.003, plate, [0, 0.025, 0])); f.position.y = 0.05 + k * 0.05; f.rotation.y = k * 0.025; g.add(f); }
           return g;
         },
         // an 11-storey office block (60 x 30 x 44 m, 1 unit = 40 m): ribbon windows, a glass lobby with a canopy, rooftop plant
@@ -662,7 +676,8 @@
         tower_building: () => {
           const g = group(mesh(new THREE.BoxGeometry(0.56, 0.08, 0.48), M.glass, [0, 0.04, 0]), block(0.52, 1.65, 0.44, 0.08, ftex('twF', 6, 30, 'punched', 71), ftex('twS', 5, 30, 'punched', 73)),
             rbox(0.5, 0.08, 0.42, 0.005, M.glass, [0, 1.77, 0]), rbox(0.56, 0.008, 0.48, 0.003, M.white, [0, 1.82, 0]));
-          for (let k = 1; k < 30; k++) g.add(rbox(0.58, 0.006, 0.5, 0.003, M.white, [0, 0.08 + k * 0.055, 0]));
+          const conc = real('#7d8591');
+          for (let k = 1; k < 30; k++) g.add(rbox(0.58, 0.006, 0.5, 0.003, conc, [0, 0.08 + k * 0.055, 0]));
           return g;
         },
         // a two-storey family house (12 x 9 m, 7.5 m to the ridge, 1 unit = 7 m): gable roof with overhangs, chimney, framed
@@ -691,7 +706,7 @@
       const ext = (shape, mat, depth = 0.14) => { const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.03, bevelSegments: 4, curveSegments: 32 }); g.center(); return mesh(g, mat); };
       const tube = (pts, r, mat) => mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(([x, y]) => V(x, y, 0)), false, 'catmullrom', 0), 64, r, 16), mat);
       const arc = (r1, r2, a0, a1) => { const s = new THREE.Shape(); s.absarc(0, 0, r2, a0, a1, false); s.absarc(0, 0, r1, a1, a0, true); return s; };
-      const sym = (c) => new THREE.MeshPhysicalMaterial({ color: new THREE.Color(c), roughness: 0.22, clearcoat: 1, clearcoatRoughness: 0.08, emissive: new THREE.Color(c), emissiveIntensity: 0.18 });
+      const sym = (c) => real(new THREE.Color(c).getHex());
       const SYM = {
         wifi: (c) => group(...[0.25, 0.55, 0.85].map(r => { const m = ext(arc(r, r + 0.17, Math.PI / 4, Math.PI * 3 / 4), sym(c)); m.position.y = r * 0.75 - 0.15; return m; }), mesh(new THREE.SphereGeometry(0.13, 24, 16), sym(c), [0, -0.38, 0])),
         bluetooth: (c) => group(ext((() => { const s = new THREE.Shape(); s.absarc(0, 0, 0.75, 0, Math.PI * 2); return s; })(), sym(c), 0.12),
@@ -726,6 +741,11 @@
           const bin = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0)).buffer;
           const model = (await gltfLoader.parseAsync(bin, './')).scene;
           model.traverse(o => { if (o.isMesh && !o.geometry.attributes.normal) o.geometry.computeVertexNormals(); });
+          const cols = new Set(), vcolor = []; model.traverse(o => { if (o.isMesh) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(mt => mt.color && cols.add(mt.color.getHex())); if (o.geometry.attributes.color) vcolor.push(o); } });
+          if (cols.size > 1 || vcolor.length) model.traverse(o => {
+            if (!o.isMesh || Array.isArray(o.material) || !o.material.color) return;
+            const hex = o.material.color.getHex(), mt = real(hex); if (o.geometry.attributes.color) mt.userData.vcol = true; o.material = mt;
+          });
           model.updateMatrixWorld(true);
           const box = new THREE.Box3().setFromObject(model), size = box.getSize(V()), mid = box.getCenter(V());
           model.position.sub(V(mid.x, box.min.y, mid.z));
