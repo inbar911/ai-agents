@@ -702,6 +702,120 @@
           for (const sx of [-1, 1]) for (let k = 0; k < 6; k++) g.add(rbox(0.008, 0.18, 0.02, 0.003, M.darkMetal, [sx * (0.58 + k * 0.03), -0.36 + k * 0.01, -0.17], [0, 0, sx * 0.3]));
           g.rotation.x = -0.95; g.position.y = 0.42; return group(g);
         },
+        // DualSense style (160 x 106 x 66 mm, 1 unit = 100 mm): one moulded outline with the two grips flaring down, the
+        // touchpad and light bar in the middle, two sticks side by side low, D-pad and four face buttons high. No logos.
+        controller_ps: () => {
+          const s = new THREE.Shape();
+          s.moveTo(-0.32, 0.42); s.lineTo(0.32, 0.42);
+          s.bezierCurveTo(0.6, 0.44, 0.78, 0.36, 0.8, 0.12);
+          s.bezierCurveTo(0.84, -0.18, 0.82, -0.52, 0.66, -0.64);
+          s.bezierCurveTo(0.54, -0.72, 0.42, -0.62, 0.36, -0.42);
+          s.bezierCurveTo(0.3, -0.24, 0.16, -0.2, 0, -0.2);
+          s.bezierCurveTo(-0.16, -0.2, -0.3, -0.24, -0.36, -0.42);
+          s.bezierCurveTo(-0.42, -0.62, -0.54, -0.72, -0.66, -0.64);
+          s.bezierCurveTo(-0.82, -0.52, -0.84, -0.18, -0.8, 0.12);
+          s.bezierCurveTo(-0.78, 0.36, -0.6, 0.44, -0.32, 0.42);
+          const geo = new THREE.ExtrudeGeometry(s, { depth: 0.18, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.07, bevelSegments: 5, curveSegments: 24 });
+          geo.translate(0, 0, -0.09);
+          const key = M.white, g = group(mesh(geo, M.black));
+          g.add(slab(0.56, 0.3, 0.05, 0.06, 0.012, M.darkMetal, [0, 0.2, 0.17]), slab(0.46, 0.04, 0.02, 0.02, 0.005, glow(PAL.accent[1], 1.6), [0, 0.04, 0.165]));
+          for (const x of [-0.24, 0.24]) g.add(cyl(0.085, 0.09, 0.06, M.darkMetal, [x, -0.14, 0.2], [Math.PI / 2, 0, 0], 32), cyl(0.075, 0.075, 0.03, key, [x, -0.14, 0.24], [Math.PI / 2, 0, 0], 32));
+          for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) g.add(rbox(0.07, 0.07, 0.03, 0.015, key, [-0.52 + dx * 0.075, 0.12 + dy * 0.075, 0.175]), cyl(0.04, 0.04, 0.03, key, [0.52 + dx * 0.085, 0.12 + dy * 0.085, 0.175], [Math.PI / 2, 0, 0], 24));
+          g.add(cyl(0.03, 0.03, 0.02, key, [0, -0.08, 0.17], [Math.PI / 2, 0, 0], 20), rbox(0.04, 0.06, 0.02, 0.01, key, [-0.36, 0.33, 0.15]), rbox(0.04, 0.06, 0.02, 0.01, key, [0.36, 0.33, 0.15]));
+          for (const sx of [-1, 1]) g.add(rbox(0.36, 0.06, 0.14, 0.025, M.darkMetal, [sx * 0.5, 0.42, 0.0], [0, 0, -sx * 0.15]), rbox(0.2, 0.14, 0.12, 0.04, M.darkMetal, [sx * 0.52, 0.42, -0.14], [-0.4, 0, -sx * 0.15]));
+          g.rotation.x = -0.95; g.position.y = 0.42; return group(g);
+        },
+        // PS5 style console standing up (390 x 104 x 260 mm, 1 unit = 200 mm): a black core between two tall white wings
+        // that flare out at the top, light strips where they meet, the disc slot, buttons and ports on the front, the round
+        // stand. No logos.
+        console_ps: () => {
+          const g = group(rbox(0.32, 1.76, 1.06, 0.05, M.black, [0, 0.98, 0]));
+          const w = new THREE.Shape();
+          w.moveTo(-0.52, 0.08); w.lineTo(0.48, 0.08);
+          w.bezierCurveTo(0.56, 0.7, 0.58, 1.4, 0.72, 1.98);
+          w.bezierCurveTo(0.3, 2.0, -0.3, 2.0, -0.62, 1.96);
+          w.bezierCurveTo(-0.6, 1.4, -0.56, 0.6, -0.52, 0.08);
+          for (const sx of [-1, 1]) {
+            const geo = new THREE.ExtrudeGeometry(w, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 3, curveSegments: 24 });
+            geo.rotateY(-Math.PI / 2); g.add(mesh(geo, M.white, [sx * 0.2 + (sx > 0 ? 0.05 : 0), 0, 0]));
+            g.add(rbox(0.012, 1.5, 0.012, 0.004, glow('#3b82ff', 1.6), [sx * 0.168, 1.0, 0.535]), rbox(0.012, 0.012, 0.9, 0.004, glow('#3b82ff', 1.4), [sx * 0.168, 1.865, 0.05]));
+          }
+          // front: the disc slot, eject and power buttons, USB-A and USB-C; top and back vents; the stand
+          g.add(rbox(0.012, 0.03, 0.62, 0.008, M.darkMetal, [0.14, 0.42, 0.53], [0, Math.PI / 2, 0]), rbox(0.24, 0.006, 0.006, 0.002, M.chrome, [0, 0.42, 0.534]));
+          g.add(rbox(0.05, 0.02, 0.01, 0.004, M.chrome, [-0.05, 0.62, 0.534]), rbox(0.05, 0.02, 0.01, 0.004, M.chrome, [0.05, 0.62, 0.534]));
+          g.add(rbox(0.07, 0.035, 0.012, 0.004, M.darkMetal, [-0.06, 0.78, 0.534]), rbox(0.04, 0.018, 0.012, 0.006, M.darkMetal, [0.07, 0.78, 0.534]));
+          for (let k = 0; k < 14; k++) g.add(rbox(0.26, 0.008, 0.04, 0.003, M.darkMetal, [0, 1.865, -0.45 + k * 0.065]));
+          for (let k = 0; k < 10; k++) g.add(rbox(0.24, 0.03, 0.008, 0.003, M.darkMetal, [0, 1.2 + k * 0.06, -0.534]));
+          g.add(cyl(0.3, 0.32, 0.05, M.black, [0, 0.025, 0], [0, 0, 0], 48), cyl(0.06, 0.06, 0.08, M.darkMetal, [0, 0.08, 0], [0, 0, 0], 20));
+          // inside the core: the main board, the cooling fan, the big heat sink and the power supply
+          g.add(rbox(0.012, 1.2, 0.8, 0.01, M.pcb, [-0.06, 1.0, 0]), rbox(0.03, 0.14, 0.14, 0.01, M.chrome, [-0.04, 1.1, 0.05]));
+          g.add(cyl(0.22, 0.22, 0.08, M.darkMetal, [0.06, 1.5, -0.25], [0, 0, Math.PI / 2], 36));
+          for (let k = 0; k < 12; k++) g.add(rbox(0.1, 0.5, 0.008, 0.002, M.darkMetal, [0.08, 1.0, -0.2 + k * 0.035]));
+          g.add(rbox(0.12, 0.3, 0.4, 0.02, M.darkMetal, [0.06, 0.45, -0.25]));
+          g.rotation.y = 1.05;   // the wing side towards the camera, the front still in view
+          return group(g);
+        },
+        // Xbox Series X style (151 x 301 x 151 mm, 1 unit = 200 mm): a black monolith, the dished top vent full of holes with
+        // a glow under it, power button, disc slot, USB port and pairing button on the front, ports on the back. No logos.
+        console_xbox: () => {
+          const S = 0.755, H = 1.505, g = group(rbox(S, H - 0.04, S, 0.03, M.black, [0, 0.02 + (H - 0.04) / 2, 0]), rbox(S - 0.12, 0.04, S - 0.12, 0.02, M.darkMetal, [0, 0.02, 0]));
+          g.add(cyl(0.33, 0.3, 0.04, M.darkMetal, [0, H - 0.03, 0], [0, 0, 0], 56), cyl(0.29, 0.29, 0.01, glow('#3cd070', 1.2), [0, H - 0.05, 0], [0, 0, 0], 56));
+          for (let r = 0.05; r < 0.3; r += 0.045) { const n = Math.max(6, Math.round(r * 40)); for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2 + r * 7; g.add(cyl(0.012, 0.012, 0.03, M.black, [Math.cos(a) * r, H - 0.01, Math.sin(a) * r], [0, 0, 0], 8)); } }
+          g.add(cyl(0.035, 0.035, 0.012, M.white, [-0.26, H - 0.14, S / 2 + 0.002], [Math.PI / 2, 0, 0], 24));                          // power
+          g.add(rbox(0.012, 0.6, 0.01, 0.004, M.darkMetal, [-0.26, H - 0.62, S / 2 + 0.002]), rbox(0.04, 0.03, 0.012, 0.006, M.white, [-0.26, H - 1.0, S / 2 + 0.002]));   // disc slot, eject
+          g.add(rbox(0.07, 0.035, 0.012, 0.004, M.darkMetal, [0.24, 0.22, S / 2 + 0.002]), cyl(0.018, 0.018, 0.012, M.white, [0.3, 0.32, S / 2 + 0.002], [Math.PI / 2, 0, 0], 16));
+          for (let k = 0; k < 5; k++) g.add(rbox(0.07, 0.03, 0.012, 0.004, M.darkMetal, [-0.18 + k * 0.09, 0.3, -S / 2 - 0.002]));
+          g.add(cyl(0.22, 0.22, 0.012, M.darkMetal, [0, H - 0.4, -S / 2 - 0.002], [Math.PI / 2, 0, 0], 40));                           // rear vent
+          // inside: the split motherboard, the vapour chamber heat sink, the big top fan and the power supply
+          g.add(rbox(0.6, 0.9, 0.012, 0.01, M.pcb, [0, 0.8, -0.1]), rbox(0.6, 0.6, 0.012, 0.01, M.pcb, [0, 0.55, 0.15]), rbox(0.5, 0.25, 0.3, 0.02, M.darkMetal, [0, 1.05, 0.05]));
+          for (let k = 0; k < 10; k++) g.add(rbox(0.5, 0.2, 0.006, 0.002, M.chrome, [0, 1.05, -0.08 + k * 0.03]));
+          g.add(cyl(0.3, 0.3, 0.06, M.darkMetal, [0, H - 0.12, 0], [0, 0, 0], 48), rbox(0.55, 0.22, 0.55, 0.02, M.darkMetal, [0, 0.16, 0]));
+          return group(g);
+        },
+        // a gaming PC (450 x 470 x 220 mm mid tower, 1 unit = 240 mm), the glass side facing you: frame, motherboard with
+        // CPU cooler, RAM and M.2 drive, a long three-fan graphics card, PSU under its shroud, three front fans and a rear
+        // fan with light rings, the cables, front buttons and ports, the expansion slots on the back. No logos.
+        pc_tower: () => {
+          const L = 1.96, H = 1.88, D = 0.92, x0 = -L / 2, g = group();
+          const bar = (w, h, d, at) => g.add(rbox(w, h, d, 0.01, M.darkMetal, at));
+          for (const y of [0.04, H - 0.02]) for (const z of [-D / 2, D / 2]) bar(L, 0.04, 0.04, [0, y, z]);
+          for (const x of [x0, -x0]) for (const z of [-D / 2, D / 2]) bar(0.04, H, 0.04, [x, H / 2, z]);
+          for (const x of [x0, -x0]) for (const y of [0.04, H - 0.02]) bar(0.04, 0.04, D, [x, y, 0]);
+          g.add(rbox(L, H, 0.012, 0.01, M.darkMetal, [0, H / 2, -D / 2]), rbox(L - 0.06, H - 0.06, 0.01, 0.01, M.glass, [0, H / 2, D / 2 + 0.01]));
+          g.add(rbox(0.012, H, D, 0.01, M.glass, [-x0 + 0.02, H / 2, 0]), rbox(L, 0.012, D, 0.01, M.glass, [0, H, 0]));
+          const fan = (at, axis, r = 0.2, ring = true) => {
+            const rot = axis === 'x' ? [0, 0, Math.PI / 2] : axis === 'z' ? [Math.PI / 2, 0, 0] : [0, 0, 0];
+            g.add(cyl(r * 0.28, r * 0.28, 0.05, M.black, at, rot, 20));
+            for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2, b = rbox(r * 0.7, 0.008, r * 0.32, 0.004, M.chrome, [0, 0, 0]);
+              const p = new THREE.Group(); p.position.set(...at); p.rotation.set(...rot); b.position.set(Math.cos(a) * r * 0.55, 0, Math.sin(a) * r * 0.55); b.rotation.set(0.35, -a, 0); p.add(b); g.add(p); }
+            if (ring) { const t = mesh(new THREE.TorusGeometry(r, 0.012, 8, 48), glow(PAL.accent[1], 1.5), at); t.rotation.set(...(axis === 'x' ? [0, Math.PI / 2, 0] : axis === 'z' ? [0, 0, 0] : [Math.PI / 2, 0, 0])); g.add(t); }
+          };
+          for (const y of [0.62, 1.06, 1.5]) fan([-x0 - 0.06, y, 0], 'x');
+          fan([x0 + 0.06, 1.5, -0.05], 'x');
+          // the motherboard and what sits on it
+          g.add(rbox(1.1, 1.3, 0.02, 0.01, M.pcb, [-0.3, 1.18, -D / 2 + 0.06]));
+          g.add(rbox(0.16, 0.16, 0.03, 0.01, M.chrome, [-0.35, 1.45, -D / 2 + 0.09]));
+          const fins = group(); for (let k = 0; k < 16; k++) fins.add(rbox(0.32, 0.5, 0.006, 0.002, M.chrome, [0, 0, -0.15 + k * 0.02])); fins.position.set(-0.35, 1.45, -0.1); g.add(fins);
+          for (let k = 0; k < 4; k++) g.add(mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(-0.42 + k * 0.05, 1.4, -D / 2 + 0.1), V(-0.42 + k * 0.05, 1.5, -0.3), V(-0.42 + k * 0.05, 1.68, -0.15)]), 12, 0.012, 6), M.gold));
+          fan([-0.12, 1.45, -0.1], 'x', 0.22, false);
+          for (let k = 0; k < 4; k++) g.add(rbox(0.025, 0.62, 0.14, 0.006, M.darkMetal, [0.0 + k * 0.05, 1.45, -D / 2 + 0.14]), rbox(0.026, 0.62, 0.02, 0.004, glow(PAL.accent[0], 1.3), [0.0 + k * 0.05, 1.45, -D / 2 + 0.22]));
+          g.add(rbox(0.3, 0.012, 0.08, 0.004, M.black, [-0.45, 1.05, -D / 2 + 0.08]));   // M.2 drive
+          g.add(rbox(0.2, 0.3, 0.06, 0.01, M.darkMetal, [-0.8, 1.6, -D / 2 + 0.08]));    // the I/O cover
+          // the graphics card: shroud, three fans underneath, backplate, bracket
+          g.add(rbox(1.2, 0.14, 0.4, 0.03, M.darkMetal, [-0.18, 0.86, -0.15]), rbox(1.2, 0.012, 0.4, 0.01, M.black, [-0.18, 0.94, -0.15]));
+          for (const x of [-0.6, -0.18, 0.24]) fan([x, 0.78, -0.15], 'y', 0.17, false);
+          g.add(rbox(0.02, 0.2, 0.42, 0.005, M.chrome, [x0 + 0.05, 0.86, -0.15]));
+          for (let k = 0; k < 7; k++) g.add(rbox(0.012, 0.05, 0.4, 0.003, M.darkMetal, [x0 + 0.03, 0.55 + k * 0.08, -0.15]));
+          // the shroud with the power supply under it, cables up to the board and the card, drive cage, feet
+          g.add(rbox(L - 0.08, 0.36, D - 0.06, 0.02, M.darkMetal, [0, 0.22, 0]), rbox(0.6, 0.3, 0.6, 0.02, M.black, [-0.6, 0.2, -0.05]));
+          g.add(mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(-0.4, 0.4, 0.1), V(0.3, 0.6, 0.2), V(0.32, 1.2, -0.3)]), 24, 0.035, 8), M.black));
+          g.add(mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(-0.3, 0.4, 0.15), V(0.2, 0.75, 0.1), V(0.3, 0.9, -0.05)]), 24, 0.025, 8), M.black));
+          g.add(rbox(0.3, 0.25, 0.5, 0.02, M.darkMetal, [0.6, 0.2, 0]));
+          for (const [x, z] of [[-0.8, -0.35], [0.8, -0.35], [-0.8, 0.35], [0.8, 0.35]]) g.add(cyl(0.05, 0.05, 0.04, M.black, [x, -0.02, z], [0, 0, 0], 16));
+          g.add(cyl(0.03, 0.03, 0.02, M.white, [-x0 - 0.1, H + 0.01, 0.2], [0, 0, 0], 20), rbox(0.06, 0.01, 0.03, 0.004, M.black, [-x0 - 0.1, H + 0.005, 0.05]), rbox(0.06, 0.01, 0.03, 0.004, M.black, [-x0 - 0.1, H + 0.005, -0.05]));
+          g.add(rbox(L * 0.9, 0.012, 0.012, 0.004, glow(PAL.accent[1], 1.3), [0, H - 0.08, D / 2 - 0.04]));   // light strip under the top
+          return group(g);
+        },
         car: () => hero(sedan()),
         police_car: () => {
           const g = sedan();
@@ -1268,7 +1382,8 @@
     // click, and the button turns into "Followed ✓" with a success chime
     const last = SEGS[SEGS.length - 1], he = VIDEO.lang !== 'en';
     const fcap = caps.filter(c => c.a >= last.a - 0.01).find(c => /follow|תעקבו|עקבו/i.test(c.e.inner.textContent));
-    const tapAt = fcap ? fcap.a + 0.35 : last.a + (last.b - last.a) * 0.6, cardAt = tapAt - 0.75;
+    // the card is up for the whole last line; the tap lands on the spoken word (its time from the transcript)
+    const tapAt = Math.min(DUR - 0.9, last.f ?? (fcap ? fcap.a : last.a + (last.b - last.a) * 0.6)), cardAt = Math.max(0, Math.min(last.a - 0.15, tapAt - 0.8));
     const card = txt(root, '', { x: W / 2, y: 0.47 * H, size: 40, font: F.RUBIK, weight: 800, color: '#FFFFFF', dir: DIR,
       css: { background: 'rgba(18,18,28,0.92)', borderRadius: '36px', padding: '26px 30px', boxShadow: `0 20px 60px rgba(0,0,0,0.5), 0 0 40px ${PAL.accent[0]}55`, border: '2px solid rgba(255,255,255,0.12)', zoom: '1.3' } });
     card.inner.innerHTML = `<div style="display:flex;align-items:center;gap:26px;direction:ltr">

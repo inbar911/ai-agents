@@ -103,5 +103,9 @@ def narrate(segments: list[dict[str, Any]], work: Path, lang: str = "he") -> flo
             a, b = 0.3 + (length - 0.3) * cum / total, 0.3 + (length - 0.3) * (cum + c) / total
         timing.append({"a": round(a, 3), "b": round(max(b, a + 0.4), 3)})
         cum += c
+    # when the follow word is spoken: the follow button is tapped on exactly that word
+    fw = [w for w in words if any(k in str(w.get("word", w.get("text", ""))).lower() for k in ("follow", "תעקבו", "עקבו"))]
+    if fw and timing:
+        timing[-1]["f"] = round(float(fw[-1]["start"]), 3)
     (work / "timing.js").write_text("window.TIMING = " + json.dumps(timing) + ";\n", encoding="utf-8")
     return length

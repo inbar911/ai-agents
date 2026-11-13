@@ -22,7 +22,7 @@ MODELS = ["gemini-2.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemi
 
 # Must match OBJ, SYM and ACT in engine/world.js.
 OBJECTS = ["phone", "phone_ultra", "laptop", "soda_can", "cardboard_box", "router", "earbuds", "watch", "tv", "server", "chip", "tower", "satellite", "cloud", "globe",
-           "lock", "charger", "controller", "car", "house"]
+           "lock", "charger", "controller", "controller_ps", "console_ps", "console_xbox", "pc_tower", "car", "house"]
 SYMBOLS = ["wifi", "bluetooth", "signal", "pin", "battery", "bell", "heart", "check", "cross", "bolt", "eye", "chat", "play",
            "gear", "shield", "fingerprint", "sound", "camera_icon"]
 # the model library (engine/models): ~130 CC0 / NASA models, each with tags the writer picks from
@@ -235,6 +235,8 @@ never on the hook or the last line.
 Mark exactly ONE whole key word per line with *asterisks*. Facts must be correct.
 
 3D objects (detailed, prefer these for devices): {", ".join(OBJECTS)}
+(controller = Xbox-style gamepad, controller_ps = PlayStation-style gamepad, console_ps / console_xbox = the console box
+itself, pc_tower = a gaming PC with a glass side. A line about a console shows the console, not a controller.)
 More 3D models, pick the one that shows the line exactly (name: what it is): {"; ".join(f"{n}: {', '.join(CATALOG[n]['tags'][:3])}" for n in LIBRARY)}
 3D symbols: {", ".join(SYMBOLS)}
 What can happen at a line's visual:
@@ -277,6 +279,20 @@ def _variety_problem(segs: list[dict[str, Any]]) -> str | None:
         if segs[i]["focus"] == segs[i + 1]["focus"] == segs[i + 2]["focus"]:
             return f"'{segs[i]['focus']}' on 3 lines in a row (lines {i + 1}-{i + 3})"
     return None
+
+
+def _gaming(seg: dict[str, Any], text: str) -> None:
+    """A console line shows the console and a controller line the controller, of the brand the line names."""
+    t = text.lower()
+    if seg["focus"] not in {"controller", "controller_ps", "console_ps", "console_xbox"}:
+        return
+    ps = any(k in t for k in ("playstation", "ps5", "ps4", "dualsense", "פלייסטיישן"))
+    pad = any(k in t for k in ("controller", "gamepad", "joystick", "שלט", "ג'ויסטיק"))
+    console = any(k in t for k in ("console", "קונסול"))
+    if pad or not console and seg["focus"].startswith("controller"):
+        seg["focus"] = "controller_ps" if ps else "controller" if "xbox" in t else seg["focus"] if seg["focus"].startswith("controller") else "controller"
+    else:
+        seg["focus"] = "console_ps" if ps else "console_xbox" if "xbox" in t else seg["focus"] if seg["focus"].startswith("console") else "console_ps"
 
 
 NOISE = {"eye", "gear", "heart", "pulse"}   # symbols the writer used as decoration, unrelated to the line
@@ -327,6 +343,7 @@ def _valid_script(s: Any, lang: str = "he") -> dict[str, Any]:
                 seg["value"], seg["suffix"] = x["value"], str(x.get("suffix") or "")[:3]
             else:
                 seg["action"] = "pulse"
+        _gaming(seg, x["text"])
         if x.get("symbol") in SYMBOLS and x["symbol"] != seg["focus"]:
             seg["symbol"] = x["symbol"]
         if lang == "he" and isinstance(x.get("say"), str) and _bare(x["say"]) == _bare(x["text"]):
