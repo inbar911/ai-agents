@@ -1433,6 +1433,8 @@
         tf(cp.e, { o: on ? 1 : 0, s: on ? lerp(hit ? 0.45 : 0.75, hit ? 1.12 : 1, sp(t, cp.a, 30, hit ? 0.35 : 0.5)) : 1 }); }
       const ci = E.o3(seg(t, cardAt, cardAt + 0.4));
       tf(card, { o: ci, y: (1 - ci) * 160, s: lerp(0.85, 1, ci) });
+      // the end card stands alone: the world fades and blurs away behind it
+      canvas.style.opacity = 1 - 0.88 * ci; canvas.style.filter = ci > 0 ? `blur(${ci * 14}px)` : '';
       const done = t >= tapAt;
       f0.style.display = done ? 'none' : ''; f1.style.display = done ? '' : 'none';
       fbtn.style.background = done ? '#363645' : '#0095f6';
