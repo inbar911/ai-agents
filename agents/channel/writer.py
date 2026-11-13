@@ -196,6 +196,8 @@ same model, and at least 5 different models in the video (the parts of the proce
 what receives it, who uses it). A fact about one thing (a number, an ID, a code) goes on a related model with a symbol
 or a count, not on the same object again and again. For each line also pick a "symbol" that pops up over the object to show what the line says: the line
 says "Wi-Fi" → wifi over the router; "password" → lock over the phone; "signal" → signal; "notification" → bell.
+Only when the line literally names that thing: no symbol is better than a decorative one (never an eye or a gear just
+to fill the frame), at most 3 in a video.
 Pick the visuals that show exactly what each line is about.
 Rules that matter more than anything:
 - ZERO jargon. If an idea needs a technical term, replace it with an everyday picture.
@@ -277,6 +279,8 @@ def _variety_problem(segs: list[dict[str, Any]]) -> str | None:
     return None
 
 
+NOISE = {"eye", "gear", "heart", "pulse"}   # symbols the writer used as decoration, unrelated to the line
+
 FOLLOW = {"he": ("*תעקבו*.", "אוהבים סודות כאלה? *תעקבו*.", ("תעקבו", "עקבו")),
           "en": ("*Follow*.", "Want more secrets like this? *Follow*.", ("follow",))}
 
@@ -336,6 +340,18 @@ def _valid_script(s: Any, lang: str = "he") -> dict[str, Any]:
     if last != segs[-1]["text"]:
         segs[-1].pop("say", None)
     segs[-1].update(text=last, tone="warm, friendly, loud and clear")
+    # the follow line ends on the video's main object (the follow card pops up over it), never a random figure
+    objs = [x["focus"] for x in segs[:-1] if x["focus"] not in SYMBOLS and x["focus"] != "human_figure"]
+    if objs:
+        segs[-1].update(focus=max(set(objs), key=objs.count), action="spin")
+        segs[-1].pop("symbol", None); segs[-1].pop("target", None)
+    # a symbol pops up only when it shows what the line says; the generic ones (an eye, a gear) were thrown in at random
+    shown = 0
+    for x in segs:
+        if x.get("symbol") in NOISE or shown >= 3:
+            x.pop("symbol", None)
+        elif x.get("symbol"):
+            shown += 1
     title, caption = str(s.get("title") or "")[:80], str(s.get("caption") or "")[:1500]
     if lang == "en":
         _best_hook(segs, s.get("hook_options"))

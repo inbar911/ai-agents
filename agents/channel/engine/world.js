@@ -115,14 +115,19 @@
       });
       // printed text, silkscreen and labels: drawn on a transparent canvas and laid on a part as a decal (normal blending,
       // so dark ink on a silver lid stays dark)
-      const ink = (w, h, paint) => { const m = new THREE.MeshBasicMaterial({ map: tex(w, h, paint), transparent: true, depthWrite: false }); m.userData.decal = true; return m; };
+      const ink = (w, h, paint) => { const m = new THREE.MeshBasicMaterial({ map: tex(w, h, paint), transparent: true, depthWrite: false }); m.userData.decal = true; m.userData.ink = true; return m; };
       // the Grouper edge light on real materials: a thin fresnel rim in the palette's accent
       const PBR_RIM = (sh) => {
         sh.uniforms.rimC = { value: new THREE.Color(PAL.accent[1]) };
         sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform vec3 rimC;\nvoid main() {')
           .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  gl_FragColor.rgb += rimC * 0.22 * pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 3.0);');
       };
-      function neonize(root, c) {
+      // real colour only where the colour is the object (a red car, a gold gas bottle, a soda can, the Earth); every other
+      // object, phones and boards and speakers included, stays the one-hue glass so the video keeps the palette (13.11)
+      const COLOUR = new Set(['car', 'police_car', 'sports_car', 'pickup_truck', 'delivery_truck', 'semi_truck', 'motorcycle', 'helicopter',
+        'chip', 'soda_can', 'globe', 'earth', 'planet', 'saturn', 'lock', 'padlock', 'cardboard_box', 'gas_tank', 'burger', 'pizza', 'pizza_slice',
+        'pizza_box', 'milk_carton', 'coin', 'gold_bars', 'money_bag', 'gift', 'key', 'pine_tree', 'trees', 'mountain', 'campfire', 'water_bottle', 'sofa_red']);
+      function neonize(root, c, keep = true) {
         // additive glow stacks up: a dense model with many overlapping parts (a NASA rover) burns out to white, so dim it
         let tris = 0; root.traverse(o => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
         const col = new THREE.Color(c).multiplyScalar(tris > 30000 ? Math.max(0.3, Math.sqrt(30000 / tris)) : 1), white = new THREE.Color(0xffffff);
@@ -133,8 +138,9 @@
         const meshes = []; root.traverse(o => { if (o.isMesh) meshes.push(o); });
         for (const m of meshes) {
           m.castShadow = m.receiveShadow = false;
+          if (m.material.userData.ink && !keep) { m.visible = false; continue; }   // printed labels belong to the real-colour look
           if (m.material.userData.decal) continue;
-          if (m.material.userData.real) {
+          if (m.material.userData.real && keep) {
             const sh = m.material.userData.shell;
             if (!sh) {
               const pb = m.material.userData.pbr || {};
@@ -174,15 +180,113 @@
         x.fillStyle = 'rgba(255,255,255,0.3)'; roundRect(x, 28, h - 170, w - 56, 130, 44);   // dock
         for (let k = 0; k < 4; k++) { x.fillStyle = APP[(k * 3 + 1) % APP.length]; roundRect(x, 56 + k * 112, h - 147, 84, 84, 22); }
       });
-      const phoneScreen = phoneScreenOf(false), phoneScreenUltra = phoneScreenOf(true, true), phoneScreenReal = phoneScreenOf(false, true);
-      const laptopScreen = tex(1024, 640, (x, w, h) => {
-        x.fillStyle = '#f2f4f8'; x.fillRect(0, 0, w, h);
-        x.fillStyle = '#d9dde5'; x.fillRect(0, 0, w, 54); ['#ff5f57', '#febc2e', '#28c840'].forEach((c, k) => { x.fillStyle = c; x.beginPath(); x.arc(30 + k * 32, 27, 10, 0, 7); x.fill(); });
-        x.fillStyle = '#fff'; roundRect(x, 160, 12, 700, 30, 15);
-        x.fillStyle = '#0a84ff'; roundRect(x, 60, 100, 560, 70, 14);
-        x.fillStyle = '#c9ced8'; for (let k = 0; k < 6; k++) roundRect(x, 60, 200 + k * 50, 300 + 200 * hash(k), 22, 11);
-        x.fillStyle = '#ff9f0a'; roundRect(x, 680, 100, 280, 280, 20);
+      // app icons drawn the way the real ones look (shapes and colours only, no logos): a gradient tile with a white glyph
+      const appIcon = (x, X, Y, S, kind, rad) => {
+        const T = { phone: ['#5df06f', '#26c43c'], msg: ['#5df06f', '#26c43c'], mail: ['#4fb4ff', '#1667f2'], camera: ['#d9dbe0', '#8e9199'], photos: ['#ffffff', '#f1f1f4'],
+          maps: ['#c9f0c1', '#7cd38a'], weather: ['#4aa8ff', '#1756d6'], clock: ['#1c1c1e', '#000000'], settings: ['#a7aab3', '#6b6f78'], music: ['#ff5f7a', '#f2213f'],
+          calendar: ['#ffffff', '#f3f3f5'], notes: ['#fff7d1', '#ffe17a'], calc: ['#3a3a3c', '#1c1c1e'], store: ['#36c1ff', '#1268f2'], health: ['#ffffff', '#f3f3f5'],
+          wallet: ['#1c1c1e', '#000000'], browser: ['#ffffff', '#e9f2ff'], gallery: ['#ff7aa8', '#c13cff'], contacts: ['#ff9f43', '#f26b1d'], play: ['#ffffff', '#f2f2f2'],
+          video: ['#ff4b4b', '#d21a1a'], chat: ['#5cd6ff', '#7b5cff'] }[kind];
+        const g = x.createLinearGradient(0, Y, 0, Y + S); g.addColorStop(0, T[0]); g.addColorStop(1, T[1]); x.fillStyle = g; roundRect(x, X, Y, S, S, rad);
+        const cx = X + S / 2, cy = Y + S / 2, u = S / 100, W = '#ffffff';
+        x.save(); x.lineCap = 'round'; x.lineJoin = 'round';
+        const dot = (px, py, r, c) => { x.fillStyle = c; x.beginPath(); x.arc(px, py, r, 0, 7); x.fill(); };
+        if (kind === 'phone') { x.strokeStyle = W; x.lineWidth = 13 * u; x.beginPath(); x.arc(cx, cy, 22 * u, 2.3, 5.4); x.stroke(); }
+        else if (kind === 'msg' || kind === 'chat') { x.fillStyle = W; x.beginPath(); x.ellipse(cx, cy - 3 * u, 30 * u, 24 * u, 0, 0, 7); x.fill(); x.beginPath(); x.moveTo(cx - 22 * u, cy + 12 * u); x.lineTo(cx - 28 * u, cy + 28 * u); x.lineTo(cx - 8 * u, cy + 18 * u); x.fill(); }
+        else if (kind === 'mail') { x.fillStyle = W; roundRect(x, cx - 30 * u, cy - 20 * u, 60 * u, 40 * u, 5 * u); x.strokeStyle = T[1]; x.lineWidth = 4 * u; x.beginPath(); x.moveTo(cx - 28 * u, cy - 18 * u); x.lineTo(cx, cy + 4 * u); x.lineTo(cx + 28 * u, cy - 18 * u); x.stroke(); }
+        else if (kind === 'camera') { x.fillStyle = '#2c2c2e'; roundRect(x, cx - 30 * u, cy - 18 * u, 60 * u, 40 * u, 8 * u); dot(cx, cy + 2 * u, 14 * u, '#d9dbe0'); dot(cx, cy + 2 * u, 9 * u, '#1c1c1e'); }
+        else if (kind === 'photos') { ['#ff9500', '#ffcc00', '#34c759', '#5ac8fa', '#007aff', '#af52de', '#ff2d55', '#ff3b30'].forEach((c, k) => { x.fillStyle = c; x.globalAlpha = 0.85; x.beginPath(); const a = k / 8 * Math.PI * 2; x.ellipse(cx + Math.cos(a) * 14 * u, cy + Math.sin(a) * 14 * u, 15 * u, 8 * u, a, 0, 7); x.fill(); }); x.globalAlpha = 1; }
+        else if (kind === 'maps') { x.strokeStyle = '#ffffff'; x.lineWidth = 9 * u; x.beginPath(); x.moveTo(X + 10 * u, Y + 75 * u); x.lineTo(X + 90 * u, Y + 30 * u); x.stroke(); x.strokeStyle = '#f7d046'; x.lineWidth = 6 * u; x.beginPath(); x.moveTo(X + 40 * u, Y + 5 * u); x.lineTo(X + 55 * u, Y + 95 * u); x.stroke(); dot(cx + 10 * u, cy - 6 * u, 10 * u, '#ff3b30'); }
+        else if (kind === 'weather') { dot(cx - 8 * u, cy - 8 * u, 15 * u, '#ffd60a'); x.fillStyle = W; x.beginPath(); x.ellipse(cx + 6 * u, cy + 12 * u, 26 * u, 13 * u, 0, 0, 7); x.ellipse(cx + 12 * u, cy + 2 * u, 14 * u, 13 * u, 0, 0, 7); x.fill(); }
+        else if (kind === 'clock') { dot(cx, cy, 36 * u, W); x.strokeStyle = '#000'; x.lineWidth = 4 * u; x.beginPath(); x.moveTo(cx, cy); x.lineTo(cx, cy - 26 * u); x.moveTo(cx, cy); x.lineTo(cx + 16 * u, cy + 8 * u); x.stroke(); x.strokeStyle = '#ff9500'; x.lineWidth = 2 * u; x.beginPath(); x.moveTo(cx, cy); x.lineTo(cx - 12 * u, cy + 28 * u); x.stroke(); }
+        else if (kind === 'settings') { x.fillStyle = '#e5e5ea'; for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; x.save(); x.translate(cx, cy); x.rotate(a); x.fillRect(-4 * u, -34 * u, 8 * u, 12 * u); x.restore(); } dot(cx, cy, 25 * u, '#e5e5ea'); dot(cx, cy, 12 * u, '#6b6f78'); }
+        else if (kind === 'music') { x.fillStyle = W; x.fillRect(cx + 6 * u, cy - 26 * u, 6 * u, 40 * u); x.fillRect(cx - 18 * u, cy - 20 * u, 6 * u, 40 * u); x.beginPath(); x.moveTo(cx - 18 * u, cy - 20 * u); x.lineTo(cx + 12 * u, cy - 28 * u); x.lineTo(cx + 12 * u, cy - 18 * u); x.lineTo(cx - 18 * u, cy - 10 * u); x.fill(); dot(cx - 22 * u, cy + 20 * u, 9 * u, W); dot(cx + 2 * u, cy + 14 * u, 9 * u, W); }
+        else if (kind === 'calendar') { x.fillStyle = '#ff3b30'; x.font = `700 ${16 * u}px Rubik`; x.textAlign = 'center'; x.fillText('FRIDAY', cx, Y + 26 * u); x.fillStyle = '#1c1c1e'; x.font = `400 ${52 * u}px Rubik`; x.fillText('13', cx, Y + 80 * u); }
+        else if (kind === 'notes') { x.fillStyle = '#ffd60a'; x.fillRect(X, Y + 8 * u, S, 18 * u); x.strokeStyle = '#d6d0b8'; x.lineWidth = 2 * u; for (let k = 0; k < 4; k++) { x.beginPath(); x.moveTo(X + 12 * u, Y + (42 + k * 15) * u); x.lineTo(X + 88 * u, Y + (42 + k * 15) * u); x.stroke(); } }
+        else if (kind === 'calc') { [['#a5a5a5', -1, -1], ['#a5a5a5', 1, -1], ['#ff9f0a', 1, 1], ['#505050', -1, 1]].forEach(([c, i, j]) => dot(cx + i * 15 * u, cy + j * 15 * u, 11 * u, c)); }
+        else if (kind === 'store') { x.strokeStyle = W; x.lineWidth = 8 * u; x.beginPath(); x.moveTo(cx - 6 * u, cy - 28 * u); x.lineTo(cx - 24 * u, cy + 20 * u); x.moveTo(cx + 6 * u, cy - 28 * u); x.lineTo(cx + 24 * u, cy + 20 * u); x.moveTo(cx - 28 * u, cy + 6 * u); x.lineTo(cx + 28 * u, cy + 6 * u); x.stroke(); }
+        else if (kind === 'health') { x.fillStyle = '#ff2d55'; x.beginPath(); x.moveTo(cx, cy + 26 * u); x.bezierCurveTo(cx - 40 * u, cy, cx - 22 * u, cy - 32 * u, cx, cy - 12 * u); x.bezierCurveTo(cx + 22 * u, cy - 32 * u, cx + 40 * u, cy, cx, cy + 26 * u); x.fill(); }
+        else if (kind === 'wallet') { [['#34c759', -14], ['#ff9f0a', -4], ['#007aff', 6], ['#ff3b30', 16]].forEach(([c, dy]) => { x.fillStyle = c; roundRect(x, cx - 30 * u, cy + dy * u - 10 * u, 60 * u, 20 * u, 4 * u); }); }
+        else if (kind === 'browser') { dot(cx, cy, 34 * u, '#1a8cff'); dot(cx, cy, 30 * u, '#ffffff'); x.fillStyle = '#ff3b30'; x.beginPath(); x.moveTo(cx + 20 * u, cy - 20 * u); x.lineTo(cx + 5 * u, cy + 5 * u); x.lineTo(cx - 5 * u, cy - 5 * u); x.fill(); x.fillStyle = '#c7c7cc'; x.beginPath(); x.moveTo(cx - 20 * u, cy + 20 * u); x.lineTo(cx + 5 * u, cy + 5 * u); x.lineTo(cx - 5 * u, cy - 5 * u); x.fill(); }
+        else if (kind === 'gallery') { x.fillStyle = W; x.beginPath(); x.ellipse(cx, cy - 4 * u, 22 * u, 22 * u, 0, 0, 7); x.fill(); x.fillStyle = T[1]; x.beginPath(); x.moveTo(cx - 16 * u, cy + 8 * u); x.lineTo(cx - 2 * u, cy - 10 * u); x.lineTo(cx + 16 * u, cy + 8 * u); x.fill(); }
+        else if (kind === 'contacts') { dot(cx, cy - 10 * u, 13 * u, W); x.fillStyle = W; x.beginPath(); x.ellipse(cx, cy + 22 * u, 24 * u, 14 * u, 0, Math.PI, 0); x.fill(); }
+        else if (kind === 'play') { [['#00d26a', 0], ['#ffc800', 1], ['#ff3a44', 2], ['#00a2ff', 3]].forEach(([c, k]) => { x.fillStyle = c; x.beginPath(); x.moveTo(cx - 20 * u, cy - 28 * u); x.lineTo(cx + 28 * u, cy); x.lineTo(cx - 20 * u, cy + 28 * u); x.globalAlpha = 1 - k * 0.2; x.fill(); }); x.globalAlpha = 1; }
+        else if (kind === 'video') { x.fillStyle = W; x.beginPath(); x.moveTo(cx - 12 * u, cy - 18 * u); x.lineTo(cx + 20 * u, cy); x.lineTo(cx - 12 * u, cy + 18 * u); x.fill(); }
+        x.restore();
+      };
+      const statusIcons = (x, R, y, s = 1) => {   // signal bars, Wi-Fi and battery, right-aligned at R
+        x.fillStyle = '#fff'; for (let k = 0; k < 4; k++) x.fillRect(R - 150 * s + k * 9 * s, y - (6 + k * 5) * s, 6 * s, (6 + k * 5) * s);
+        x.strokeStyle = '#fff'; x.lineWidth = 4 * s; for (let k = 0; k < 3; k++) { x.beginPath(); x.arc(R - 86 * s, y, (6 + k * 7) * s, -2.4, -0.75); x.stroke(); }
+        x.lineWidth = 2.5 * s; x.strokeStyle = 'rgba(255,255,255,0.6)'; x.beginPath(); x.roundRect(R - 56 * s, y - 20 * s, 46 * s, 22 * s, 6 * s); x.stroke(); x.fillRect(R - 8 * s, y - 13 * s, 3 * s, 8 * s);
+        x.fillStyle = '#fff'; roundRect(x, R - 53 * s, y - 17 * s, 34 * s, 16 * s, 4 * s);
+      };
+      // an iPhone-style home screen: dark wallpaper, Dynamic Island, two widgets, the 4-column grid with labels, the glass dock
+      const iosScreen = tex(512, 1060, (x, w, h) => {
+        x.fillStyle = '#000'; x.fillRect(0, 0, w, h);
+        let g = x.createRadialGradient(140, 300, 20, 140, 300, 520); g.addColorStop(0, '#2b3f8f'); g.addColorStop(0.55, '#141a3d'); g.addColorStop(1, '#05060d'); x.fillStyle = g; x.fillRect(0, 0, w, h);
+        g = x.createRadialGradient(420, 860, 10, 420, 860, 360); g.addColorStop(0, 'rgba(160,70,200,0.55)'); g.addColorStop(1, 'rgba(160,70,200,0)'); x.fillStyle = g; x.fillRect(0, 0, w, h);
+        x.fillStyle = '#fff'; x.font = '600 30px Rubik'; x.textAlign = 'center'; x.fillText('9:41', 82, 60); statusIcons(x, w - 22, 58, 0.75);
+        x.fillStyle = '#000'; roundRect(x, w / 2 - 70, 24, 140, 42, 21);
+        // widgets: weather and calendar
+        g = x.createLinearGradient(0, 100, 0, 300); g.addColorStop(0, '#3a8cff'); g.addColorStop(1, '#1d4fc4'); x.fillStyle = g; roundRect(x, 34, 104, 210, 210, 40);
+        x.fillStyle = '#fff'; x.textAlign = 'left'; x.font = '600 24px Rubik'; x.fillText('Tel Aviv', 56, 148); x.font = '300 74px Rubik'; x.fillText('24°', 52, 228);
+        x.font = '500 20px Rubik'; x.fillText('Mostly Sunny', 56, 270); x.fillText('H:27°  L:19°', 56, 296);
+        x.fillStyle = 'rgba(28,28,30,0.92)'; roundRect(x, 268, 104, 210, 210, 40);
+        x.fillStyle = '#ff453a'; x.font = '700 20px Rubik'; x.fillText('FRIDAY', 292, 146); x.fillStyle = '#fff'; x.font = '300 66px Rubik'; x.fillText('13', 290, 212);
+        x.fillStyle = '#5e5ce6'; roundRect(x, 290, 232, 6, 50, 3); x.fillStyle = '#fff'; x.font = '600 18px Rubik'; x.fillText('Math exam', 306, 252); x.fillStyle = 'rgba(255,255,255,0.6)'; x.fillText('08:15 – 09:45', 306, 276);
+        x.fillStyle = 'rgba(255,255,255,0.75)'; x.font = '500 16px Rubik'; x.textAlign = 'center'; x.fillText('Weather', 139, 338); x.fillText('Calendar', 373, 338);
+        const grid = [['mail', 'Mail'], ['calendar', 'Calendar'], ['photos', 'Photos'], ['camera', 'Camera'], ['maps', 'Maps'], ['clock', 'Clock'], ['weather', 'Weather'], ['notes', 'Notes'],
+          ['store', 'Store'], ['health', 'Health'], ['wallet', 'Wallet'], ['settings', 'Settings'], ['calc', 'Calculator'], ['video', 'TV'], ['contacts', 'Contacts'], ['chat', 'Chat']];
+        grid.forEach(([k, label], i) => { const X = 40 + (i % 4) * 114, Y = 372 + Math.floor(i / 4) * 126; appIcon(x, X, Y, 90, k, 22); x.fillStyle = '#fff'; x.font = '500 17px Rubik'; x.fillText(label, X + 45, Y + 112); });
+        x.fillStyle = 'rgba(255,255,255,0.9)'; x.beginPath(); x.arc(w / 2 - 10, 888, 5, 0, 7); x.fill(); x.fillStyle = 'rgba(255,255,255,0.35)'; x.beginPath(); x.arc(w / 2 + 10, 888, 5, 0, 7); x.fill();
+        x.fillStyle = 'rgba(255,255,255,0.22)'; roundRect(x, 22, 912, w - 44, 120, 46);   // glass dock
+        ['phone', 'browser', 'msg', 'music'].forEach((k, i) => appIcon(x, 40 + i * 114, 927, 90, k, 22));
+        x.fillStyle = '#fff'; roundRect(x, w / 2 - 70, h - 18, 140, 7, 4);   // home indicator
       });
+      // a Galaxy-style home screen (One UI): punch-hole camera, the big clock and date widget, a search bar, rounder icons
+      // with labels, the dock and the three navigation buttons
+      const androidScreen = tex(512, 1060, (x, w, h) => {
+        let g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#0b1f2e'); g.addColorStop(0.5, '#0d3b4a'); g.addColorStop(1, '#2a0f3d'); x.fillStyle = g; x.fillRect(0, 0, w, h);
+        for (let k = 0; k < 3; k++) { g = x.createRadialGradient(w * [0.85, 0.1, 0.6][k], h * [0.18, 0.55, 0.9][k], 0, w * [0.85, 0.1, 0.6][k], h * [0.18, 0.55, 0.9][k], 260); g.addColorStop(0, ['rgba(0,200,180,0.45)', 'rgba(70,90,255,0.4)', 'rgba(220,60,160,0.4)'][k]); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, w, h); }
+        x.fillStyle = '#fff'; x.font = '500 24px Rubik'; x.textAlign = 'left'; x.fillText('12:45', 26, 52); statusIcons(x, w - 20, 50, 0.65);
+        x.fillStyle = '#000'; x.beginPath(); x.arc(w / 2, 40, 15, 0, 7); x.fill(); x.fillStyle = '#1b1d24'; x.beginPath(); x.arc(w / 2, 40, 7, 0, 7); x.fill();
+        x.textAlign = 'center'; x.fillStyle = '#fff'; x.font = '200 120px Rubik'; x.fillText('12:45', w / 2, 230);
+        x.font = '500 26px Rubik'; x.fillText('Fri, 13 November', w / 2, 278); x.font = '400 22px Rubik'; x.fillStyle = 'rgba(255,255,255,0.8)'; x.fillText('☀  24°  Tel Aviv', w / 2, 314);
+        x.fillStyle = 'rgba(255,255,255,0.92)'; roundRect(x, 34, 360, w - 68, 70, 35);   // search bar
+        x.fillStyle = '#5f6368'; x.font = '400 24px Rubik'; x.textAlign = 'left'; x.fillText('Search', 96, 404);
+        x.strokeStyle = '#5f6368'; x.lineWidth = 4; x.beginPath(); x.arc(70, 393, 11, 0, 7); x.moveTo(78, 401); x.lineTo(86, 409); x.stroke();
+        x.fillStyle = '#4285f4'; roundRect(x, w - 82, 380, 12, 22, 6); x.strokeStyle = '#4285f4'; x.lineWidth = 3; x.beginPath(); x.arc(w - 76, 395, 12, 0.2, Math.PI - 0.2); x.stroke();
+        const grid = [['gallery', 'Gallery'], ['calendar', 'Calendar'], ['weather', 'Weather'], ['clock', 'Clock'], ['play', 'Play Store'], ['camera', 'Camera'], ['contacts', 'Contacts'], ['settings', 'Settings'],
+          ['notes', 'Notes'], ['calc', 'Calculator'], ['video', 'Videos'], ['mail', 'Email']];
+        x.textAlign = 'center';
+        grid.forEach(([k, label], i) => { const X = 44 + (i % 4) * 112, Y = 490 + Math.floor(i / 4) * 128; appIcon(x, X, Y, 86, k, 30); x.fillStyle = '#fff'; x.font = '500 17px Rubik'; x.fillText(label, X + 43, Y + 110); });
+        ['phone', 'chat', 'browser', 'camera'].forEach((k, i) => appIcon(x, 44 + i * 112, 900, 86, k, 30));
+        x.strokeStyle = 'rgba(255,255,255,0.85)'; x.lineWidth = 4;   // navigation: recents, home, back
+        [0, 1, 2].forEach(k => { x.beginPath(); x.moveTo(w * 0.27 - 8 + k * 8, h - 42); x.lineTo(w * 0.27 - 8 + k * 8, h - 22); x.stroke(); });
+        x.beginPath(); x.roundRect(w / 2 - 13, h - 45, 26, 26, 8); x.stroke();
+        x.beginPath(); x.moveTo(w * 0.73 + 6, h - 44); x.lineTo(w * 0.73 - 6, h - 32); x.lineTo(w * 0.73 + 6, h - 20); x.stroke();
+      });
+      const blackGlass = Object.assign(new THREE.MeshBasicMaterial({ color: 0x050608 }), { userData: { decal: true } });   // the screen's black glass and bezel
+      const phoneScreen = phoneScreenOf(false), phoneScreenUltra = androidScreen, phoneScreenReal = iosScreen;
+      // a laptop desktop: dark wallpaper, the menu bar, a code editor and a browser window, the dock (drawn after the icons)
+      const laptopScreen = tex(1024, 640, (x, w, h) => {
+        let g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#16224f'); g.addColorStop(0.6, '#2a1650'); g.addColorStop(1, '#0b0d1c'); x.fillStyle = g; x.fillRect(0, 0, w, h);
+        x.fillStyle = 'rgba(20,20,28,0.75)'; x.fillRect(0, 0, w, 24); x.fillStyle = '#fff'; x.font = '600 13px Rubik'; x.textAlign = 'left';
+        ['File', 'Edit', 'View', 'Window', 'Help'].forEach((t, k) => x.fillText(t, 40 + k * 52, 17)); x.textAlign = 'right'; x.fillText('Fri 13 Nov  12:45', w - 14, 17);
+        const win = (X, Y, W, H, bar) => { x.fillStyle = 'rgba(0,0,0,0.35)'; roundRect(x, X + 4, Y + 8, W, H, 12); x.fillStyle = bar; roundRect(x, X, Y, W, H, 12); ['#ff5f57', '#febc2e', '#28c840'].forEach((c, k) => { x.fillStyle = c; x.beginPath(); x.arc(X + 18 + k * 20, Y + 16, 6, 0, 7); x.fill(); }); };
+        win(40, 50, 560, 470, '#1e1f29');   // code editor
+        x.fillStyle = '#16171f'; x.fillRect(40, 34 + 36, 130, 450); x.fillStyle = '#6b7089'; x.font = '500 12px Rubik'; x.textAlign = 'left';
+        ['src', '  app.ts', '  router.ts', '  db.ts', 'tests', 'package.json'].forEach((t, k) => x.fillText(t, 54, 96 + k * 22));
+        const C = ['#c792ea', '#82aaff', '#c3e88d', '#f78c6c', '#89ddff', '#ffcb6b', '#eeffff'];
+        for (let r = 0; r < 19; r++) { let X = 200 + (hash(r + 5) * 3 | 0) * 18; x.fillStyle = '#4b5068'; x.fillText(String(r + 1), 178, 96 + r * 22); for (let k = 0; k < 1 + (hash(r) * 4 | 0); k++) { const L = 30 + hash(r * 7 + k) * 110; x.fillStyle = C[(r + k * 3) % C.length]; roundRect(x, X, 86 + r * 22, L, 10, 4); X += L + 10; } }
+        win(520, 120, 460, 400, '#f4f5f8');   // browser
+        x.fillStyle = '#ffffff'; roundRect(x, 600, 132, 300, 22, 11); x.fillStyle = '#0a84ff'; roundRect(x, 545, 180, 410, 120, 12);
+        x.fillStyle = '#fff'; x.font = '800 30px Rubik'; x.textAlign = 'left'; x.fillText('How it really works', 565, 235); x.font = '500 16px Rubik'; x.fillText('The secret inside every device', 565, 268);
+        x.fillStyle = '#d5d8e0'; for (let k = 0; k < 5; k++) roundRect(x, 545, 320 + k * 30, 220 + 160 * hash(k + 3), 14, 7);
+        x.fillStyle = '#ff9f0a'; roundRect(x, 800, 320, 155, 130, 12);
+      });
+      { const c = laptopScreen.image, x = c.getContext('2d'); x.fillStyle = 'rgba(255,255,255,0.2)'; roundRect(x, 262, 566, 500, 64, 18);
+        ['browser', 'mail', 'msg', 'music', 'photos', 'calendar', 'notes', 'settings'].forEach((k, i) => appIcon(x, 274 + i * 61, 574, 48, k, 12)); laptopScreen.needsUpdate = true; }
       const watchFace = tex(256, 300, (x, w, h) => {
         x.fillStyle = '#000'; x.fillRect(0, 0, w, h);
         [['#fa114f', 100], ['#a6ff00', 78], ['#00d8ff', 56]].forEach(([c, r], k) => { x.strokeStyle = c; x.lineWidth = 18; x.lineCap = 'round'; x.beginPath(); x.arc(w / 2, h / 2, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * (1.2 + 0.25 * k)); x.stroke(); });
@@ -198,7 +302,6 @@
         x.fillStyle = '#3fbf6b'; for (let k = 0; k < 26; k++) { x.beginPath(); x.ellipse(hash(k) * w, 80 + hash(k + 40) * (h - 160), 40 + 90 * hash(k + 9), 25 + 60 * hash(k + 3), hash(k + 7) * 3, 0, 7); x.fill(); }
         x.fillStyle = '#f5f7fa'; x.fillRect(0, 0, w, 26); x.fillRect(0, h - 26, w, 26);
       });
-      const keysTex = tex(512, 200, (x, w, h) => { x.fillStyle = '#2a2d33'; x.fillRect(0, 0, w, h); x.fillStyle = '#111317'; for (let r = 0; r < 5; r++) for (let c = 0; c < 14; c++) roundRect(x, 6 + c * 36, 8 + r * 38, 30, 32, 5); });
       const bayTex = tex(256, 512, (x, w, h) => { x.fillStyle = '#1f232a'; x.fillRect(0, 0, w, h); for (let k = 0; k < 10; k++) { x.fillStyle = '#2c313a'; roundRect(x, 14, 14 + k * 50, w - 28, 40, 6); x.fillStyle = k % 3 ? '#22d36b' : '#2f7bff'; x.beginPath(); x.arc(w - 36, 34 + k * 50, 6, 0, 7); x.fill(); } });
       const panelTex = tex(256, 256, (x, w, h) => { x.fillStyle = '#1f3e9a'; x.fillRect(0, 0, w, h); x.strokeStyle = '#7fa6ff'; x.lineWidth = 3; for (let k = 0; k <= 8; k++) { x.beginPath(); x.moveTo(k * 32, 0); x.lineTo(k * 32, h); x.stroke(); x.beginPath(); x.moveTo(0, k * 32); x.lineTo(w, k * 32); x.stroke(); } });
       const rackTex = tex(512, 1760, (x, w, h) => {
@@ -327,7 +430,8 @@
             board = real('#16324f'), chip = real('#a8adb5'), copper = real('#c47a3a'), flex = real('#c98a2c'), steel = real('#8d939c');
           const g = group(slab(W, H, D, R, 0.012, ti), slab(W - 0.01, H - 0.01, 0.012, R - 0.005, 0.004, glassS, [0, 0, D / 2 - 0.004]),
             mesh(new THREE.ShapeGeometry(rrShape(W - 0.05, H - 0.05, R - 0.025), 16), Object.assign(new THREE.MeshBasicMaterial({ map: phoneScreenReal }), { userData: { decal: true } }), [0, 0, D / 2 + 0.0035]));
-          fitUV(g.children[2].geometry, W - 0.05, H - 0.05);   // the screen is lit and opaque: the parts show through the back glass
+          fitUV(g.children[2].geometry, W - 0.05, H - 0.05);
+          g.add(mesh(new THREE.ShapeGeometry(rrShape(W - 0.012, H - 0.012, R - 0.006), 16), blackGlass, [0, 0, D / 2 + 0.0026]));   // the screen is lit and opaque: the parts show through the back glass
           // inside: battery (an L around the board) with its printed label
           g.add(rbox(0.6, 0.86, 0.034, 0.02, black, [0.02, -0.28, -0.006]), rbox(0.3, 0.3, 0.034, 0.02, black, [-0.13, 0.33, -0.006]));
           g.add(plane(0.5, 0.3, ink(400, 240, (x) => { x.fillStyle = 'rgba(235,235,235,0.9)'; x.font = '700 34px Rubik'; x.fillText('Li-ion Polymer', 20, 60); x.font = '400 26px Rubik'; x.fillText('4685 mAh · 3.86 V · 18.1 Wh', 20, 110); x.fillText('Do not puncture or heat', 20, 160); }), [0.02, -0.28, 0.0115]));
@@ -359,8 +463,9 @@
         phone_ultra: () => {
           const W = 0.781, H = 1.636, D = 0.079, R = 0.075;
           const g = group(slab(W, H, D, R, 0.006, M.titanium), slab(W - 0.008, H - 0.008, 0.01, R - 0.004, 0.003, M.glass, [0, 0, D / 2 - 0.003]),
-            mesh(new THREE.ShapeGeometry(rrShape(W - 0.035, H - 0.035, R - 0.02), 16), screenMat(phoneScreenUltra), [0, 0, D / 2 + 0.003]));
+            mesh(new THREE.ShapeGeometry(rrShape(W - 0.035, H - 0.035, R - 0.02), 16), Object.assign(new THREE.MeshBasicMaterial({ map: phoneScreenUltra }), { userData: { decal: true } }), [0, 0, D / 2 + 0.0036]));
           fitUV(g.children[2].geometry, W - 0.035, H - 0.035);
+          g.add(mesh(new THREE.ShapeGeometry(rrShape(W - 0.01, H - 0.01, R - 0.005), 16), blackGlass, [0, 0, D / 2 + 0.0026]));
           // camera island: a raised pill holding three big lenses in a column, with the periscope, flash and laser beside it
           g.add(slab(0.2, 0.62, 0.022, 0.1, 0.006, M.glass, [-0.24, H / 2 - 0.4, -D / 2 - 0.011]));
           [0.18, 0.4, 0.62].forEach(y => g.add(cyl(0.072, 0.072, 0.02, M.chrome, [-0.24, H / 2 - y, -D / 2 - 0.03], [Math.PI / 2, 0, 0], 48), cyl(0.055, 0.055, 0.022, M.lens, [-0.24, H / 2 - y, -D / 2 - 0.032], [Math.PI / 2, 0, 0], 48)));
@@ -373,16 +478,52 @@
         // MacBook Pro 14 style (312.6 x 221.2 x 15.5 mm, 1 unit = 160 mm): flat aluminium base, black keys in a well,
         // a big trackpad, thin bezels with the camera notch, lid open ~110 degrees. No logo.
         laptop: () => {
-          const W = 1.954, Dp = 1.383, R = 0.075, flat = [-Math.PI / 2, 0, 0];
-          const base = group(slab(W, Dp, 0.058, R, 0.012, M.alu, [0, 0.029, 0], flat),
-            plane(W * 0.86, Dp * 0.42, new THREE.MeshStandardMaterial({ map: keysTex, roughness: 0.6 }), [0, 0.0595, -0.2], flat),
-            slab(0.94, 0.6, 0.004, 0.03, 0.001, M.titanium, [0, 0.059, 0.33], flat));
+          const W = 1.954, Dp = 1.383, R = 0.075, flat = [-Math.PI / 2, 0, 0], T = 0.058;
+          const g = group(slab(W, Dp, T, R, 0.012, M.alu, [0, T / 2, 0], flat));
+          // the keyboard well and every key: a function row, the number row, three letter rows and the bottom row with the
+          // space bar and the inverted-T arrows
+          g.add(rbox(W * 0.88, 0.004, 0.66, 0.01, M.black, [0, T - 0.001, -0.29]));
+          const u = 1.68 / 14.5, rows = [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5], [1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1.8, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.7], [2.3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2.2], [1, 1, 1, 1.25, 5, 1.25, 1]];
+          for (let k = 0; k < 14; k++) g.add(rbox(u * (k === 13 ? 1.5 : 1) - 0.018, 0.008, 0.045, 0.006, M.white, [-0.84 + u * (k + 0.5) + (k === 13 ? u * 0.25 : 0), T + 0.003, -0.56]));
+          rows.forEach((row, r) => { let at = -0.84; for (const kw of row) { g.add(rbox(kw * u - 0.018, 0.009, 0.082, 0.008, M.white, [at + kw * u / 2, T + 0.004, -0.48 + r * 0.1])); at += kw * u; } });
+          [[-1, 0], [0, 0], [1, 0], [0, -1]].forEach(([i, j]) => g.add(rbox(u - 0.02, 0.009, j ? 0.036 : 0.036, 0.006, M.white, [0.84 - 1.5 * u + i * u, T + 0.004, -0.06 + j * 0.044 + 0.022])));
+          g.add(rbox(u - 0.02, 0.009, 0.06, 0.02, M.white, [0.84 - u * 0.5 - 0.02, T + 0.004, -0.56]));   // the power key with Touch ID
+          // speaker grilles either side of the keys, the trackpad, the thumb notch on the front edge
+          for (const sx of [-1, 1]) for (let r = 0; r < 16; r++) for (let c = 0; c < 2; c++) g.add(cyl(0.006, 0.006, 0.004, M.black, [sx * (0.9 + c * 0.025), T + 0.001, -0.57 + r * 0.034], [0, 0, 0], 8));
+          g.add(slab(0.94, 0.58, 0.004, 0.03, 0.001, M.titanium, [0, T + 0.001, 0.34], flat));
+          g.add(rbox(0.2, 0.02, 0.03, 0.01, M.titanium, [0, T - 0.012, Dp / 2 - 0.005]));
+          // ports: MagSafe, two USB-C and the headphone jack on the left; HDMI, USB-C and the SD slot on the right
+          const port = (side, z, w, h) => g.add(rbox(0.012, h, w, Math.min(h, w) / 2.2, M.black, [side * (W / 2 + 0.001), T * 0.45, z]));
+          port(-1, -0.42, 0.11, 0.022); port(-1, -0.24, 0.06, 0.02); port(-1, -0.14, 0.06, 0.02); g.add(cyl(0.013, 0.013, 0.014, M.black, [-W / 2 - 0.001, T * 0.45, 0.25], [0, 0, Math.PI / 2], 16));
+          port(1, -0.36, 0.1, 0.022); port(1, -0.2, 0.06, 0.02); port(1, 0.1, 0.16, 0.012);
+          for (const [x, z] of [[-0.8, -0.55], [0.8, -0.55], [-0.8, 0.55], [0.8, 0.55]]) g.add(cyl(0.05, 0.05, 0.008, M.black, [x, -0.004, z], [0, 0, 0], 24));   // rubber feet
+          // inside the base: the logic board with the SoC and memory, two fans with their heat pipe, six battery cells,
+          // the speakers under the grilles and the haptic trackpad motor
+          g.add(rbox(1.0, 0.008, 0.36, 0.01, M.pcb, [0, 0.03, -0.45]), rbox(0.2, 0.012, 0.18, 0.01, M.chrome, [0, 0.038, -0.45]));
+          g.add(rbox(0.09, 0.01, 0.12, 0.005, M.black, [-0.17, 0.037, -0.45]), rbox(0.09, 0.01, 0.12, 0.005, M.black, [0.17, 0.037, -0.45]), rbox(0.16, 0.008, 0.06, 0.004, M.black, [0.36, 0.036, -0.5]), rbox(0.08, 0.008, 0.08, 0.004, M.black, [-0.36, 0.036, -0.4]));
+          for (const fx of [-0.72, 0.72]) {
+            g.add(cyl(0.13, 0.13, 0.03, M.darkMetal, [fx, 0.03, -0.42], [0, 0, 0], 36), cyl(0.035, 0.035, 0.034, M.black, [fx, 0.03, -0.42], [0, 0, 0], 20));
+            for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2; g.add(rbox(0.08, 0.026, 0.012, 0.003, M.chrome, [fx + Math.cos(a) * 0.075, 0.03, -0.42 + Math.sin(a) * 0.075], [0, -a + 0.5, 0])); }
+            g.add(rbox(0.1, 0.03, 0.2, 0.01, M.darkMetal, [fx + Math.sign(fx) * 0.12, 0.03, -0.42]));   // fin stack at the vent
+          }
+          g.add(mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(-0.62, 0.044, -0.38), V(-0.25, 0.046, -0.36), V(0, 0.046, -0.4), V(0.25, 0.046, -0.36), V(0.62, 0.044, -0.38)]), 40, 0.012, 8), M.gold));
+          for (const bx of [-0.72, 0.72]) for (let k = 0; k < 3; k++) g.add(rbox(0.36, 0.03, 0.17, 0.01, M.darkMetal, [bx, 0.022, 0.02 + k * 0.2]));
+          g.add(rbox(0.38, 0.03, 0.17, 0.01, M.darkMetal, [0, 0.022, 0.02]));
+          for (const sx of [-0.92, 0.92]) g.add(rbox(0.08, 0.03, 0.5, 0.01, M.black, [sx, 0.026, -0.32]));
+          g.add(rbox(0.3, 0.012, 0.08, 0.005, M.chrome, [0, 0.04, 0.36]));
+          // the hinge and the lid: aluminium back, black glass front with thin bezels, the camera in its notch, the display
+          g.add(cyl(0.03, 0.03, W * 0.78, M.darkMetal, [0, T, -Dp / 2 + 0.03], [0, 0, Math.PI / 2], 24));
           const lid = group(slab(W, Dp, 0.034, R, 0.008, M.alu, [0, Dp / 2, 0]),
-            mesh(new THREE.ShapeGeometry(rrShape(W - 0.04, Dp - 0.04, R - 0.02), 12), M.black, [0, Dp / 2, 0.0175]),
+            mesh(new THREE.ShapeGeometry(rrShape(W - 0.02, Dp - 0.02, R - 0.01), 12), blackGlass, [0, Dp / 2, 0.0175]),
             plane(W - 0.1, Dp - 0.12, screenMat(laptopScreen), [0, Dp / 2 - 0.02, 0.018]),
-            rbox(0.2, 0.05, 0.004, 0.02, M.black, [0, Dp - 0.08, 0.0195]));   // the notch
-          lid.position.set(0, 0.058, -Dp / 2 + 0.02); lid.rotation.x = -0.3;
-          return group(base, lid);
+            rbox(0.2, 0.05, 0.004, 0.02, M.black, [0, Dp - 0.08, 0.0195]), cyl(0.012, 0.012, 0.004, M.chrome, [0, Dp - 0.075, 0.022], [Math.PI / 2, 0, 0], 16),
+            rbox(W * 0.9, 0.012, 0.006, 0.003, M.black, [0, 0.03, 0.012]));   // the camera, the display flex at the hinge
+          // inside the lid: the panel's backlight layer and its driver board
+          lid.add(rbox(W - 0.14, Dp - 0.16, 0.006, 0.01, M.darkMetal, [0, Dp / 2 - 0.02, 0.006]), rbox(1.0, 0.06, 0.004, 0.005, M.pcb, [0, 0.1, 0.003]));
+          lid.position.set(0, T, -Dp / 2 + 0.02); lid.rotation.x = -0.3;
+          g.add(lid);
+          return g;
         },
         router: () => {
           const g = group(rbox(1.5, 0.32, 1.0, 0.12, M.white, [0, 0.16, 0]));
@@ -520,30 +661,45 @@
           return group(rbox(1.6, 1.2, 1.2, 0.02, card, [0, 0.6, 0]), rbox(1.62, 0.006, 0.01, 0.002, M.black, [0, 1.201, 0]),
             rbox(0.24, 0.008, 1.22, 0.003, tape, [0, 1.204, 0]), rbox(0.24, 0.5, 0.008, 0.003, tape, [0, 0.95, 0.604]), rbox(0.24, 0.5, 0.008, 0.003, tape, [0, 0.95, -0.604]));
         },
-        // DualSense style (160 x 106 x 66 mm, 1 unit = 100 mm): one moulded outline with the two grips flaring down,
-        // white shell, black centre, touchpad, light bar, two sticks, D-pad and four face buttons. No logos or symbols.
+        // Xbox Series style (153 x 104 x 61 mm, 1 unit = 100 mm): a rounded pebble body with grips curving down and in, the
+        // left stick high and the D-pad low on the left, the face buttons high and the right stick low on the right, the round
+        // guide button with its light ring at the top centre, view / share / menu buttons, bumpers, triggers and the USB-C port.
+        // No logos or letters.
         controller: () => {
           const s = new THREE.Shape();
-          s.moveTo(-0.32, 0.42); s.lineTo(0.32, 0.42);
-          s.bezierCurveTo(0.6, 0.44, 0.78, 0.36, 0.8, 0.12);
-          s.bezierCurveTo(0.84, -0.18, 0.82, -0.52, 0.66, -0.64);
-          s.bezierCurveTo(0.54, -0.72, 0.42, -0.62, 0.36, -0.42);
-          s.bezierCurveTo(0.3, -0.24, 0.16, -0.2, 0, -0.2);
-          s.bezierCurveTo(-0.16, -0.2, -0.3, -0.24, -0.36, -0.42);
-          s.bezierCurveTo(-0.42, -0.62, -0.54, -0.72, -0.66, -0.64);
-          s.bezierCurveTo(-0.82, -0.52, -0.84, -0.18, -0.8, 0.12);
-          s.bezierCurveTo(-0.78, 0.36, -0.6, 0.44, -0.32, 0.42);
-          const shellGeo = new THREE.ExtrudeGeometry(s, { depth: 0.18, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.07, bevelSegments: 5, curveSegments: 24 });
-          shellGeo.translate(0, 0, -0.09);
-          const shell = real('#f0f1f3'), dark = real('#1c1d22');
+          s.moveTo(0, 0.42);
+          s.bezierCurveTo(0.3, 0.45, 0.6, 0.45, 0.72, 0.3);
+          s.bezierCurveTo(0.82, 0.17, 0.84, -0.06, 0.8, -0.3);
+          s.bezierCurveTo(0.76, -0.52, 0.64, -0.64, 0.5, -0.6);
+          s.bezierCurveTo(0.4, -0.57, 0.34, -0.42, 0.26, -0.32);
+          s.bezierCurveTo(0.16, -0.22, -0.16, -0.22, -0.26, -0.32);
+          s.bezierCurveTo(-0.34, -0.42, -0.4, -0.57, -0.5, -0.6);
+          s.bezierCurveTo(-0.64, -0.64, -0.76, -0.52, -0.8, -0.3);
+          s.bezierCurveTo(-0.84, -0.06, -0.82, 0.17, -0.72, 0.3);
+          s.bezierCurveTo(-0.6, 0.45, -0.3, 0.45, 0, 0.42);
+          const shellGeo = new THREE.ExtrudeGeometry(s, { depth: 0.2, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.08, bevelSegments: 6, curveSegments: 28 });
+          shellGeo.translate(0, 0, -0.1);
+          const shell = M.black, key = M.white, Z = 0.2;
           const g = group(mesh(shellGeo, shell));
-          g.add(slab(0.56, 0.3, 0.05, 0.06, 0.012, dark, [0, 0.2, 0.17]));                                 // touchpad
-          g.add(slab(0.46, 0.04, 0.02, 0.02, 0.005, glow(PAL.accent[1], 1.6), [0, 0.04, 0.165]));          // light bar
-          for (const x of [-0.24, 0.24]) g.add(cyl(0.085, 0.09, 0.06, dark, [x, -0.14, 0.2], [Math.PI / 2, 0, 0], 32), cyl(0.075, 0.075, 0.03, M.black, [x, -0.14, 0.24], [Math.PI / 2, 0, 0], 32));   // sticks
-          for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
-            g.add(rbox(0.07, 0.07, 0.03, 0.015, dark, [-0.52 + dx * 0.075, 0.12 + dy * 0.075, 0.175]));    // D-pad
-            g.add(cyl(0.04, 0.04, 0.03, dark, [0.52 + dx * 0.085, 0.12 + dy * 0.085, 0.175], [Math.PI / 2, 0, 0], 24));   // face buttons
+          const stick = (x, y) => g.add(cyl(0.11, 0.11, 0.02, M.darkMetal, [x, y, Z], [Math.PI / 2, 0, 0], 36), cyl(0.05, 0.06, 0.07, M.darkMetal, [x, y, Z + 0.04], [Math.PI / 2, 0, 0], 20),
+            cyl(0.085, 0.08, 0.03, key, [x, y, Z + 0.085], [Math.PI / 2, 0, 0], 36), mesh(new THREE.TorusGeometry(0.075, 0.012, 8, 36), key, [x, y, Z + 0.1]));
+          stick(-0.45, 0.16); stick(0.2, -0.1);
+          // D-pad: a cross in a round well
+          g.add(mesh(new THREE.TorusGeometry(0.1, 0.012, 8, 40), M.darkMetal, [-0.2, -0.1, Z + 0.005]), rbox(0.17, 0.055, 0.03, 0.015, key, [-0.2, -0.1, Z + 0.02]), rbox(0.055, 0.17, 0.03, 0.015, key, [-0.2, -0.1, Z + 0.02]));
+          // the four face buttons in a diamond
+          for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) g.add(cyl(0.042, 0.042, 0.035, key, [0.46 + dx * 0.09, 0.16 + dy * 0.09, Z + 0.015], [Math.PI / 2, 0, 0], 28));
+          // guide button with its light ring, view and menu either side, share below
+          g.add(cyl(0.07, 0.07, 0.03, key, [0, 0.3, Z + 0.005], [Math.PI / 2, 0, 0], 36), mesh(new THREE.TorusGeometry(0.078, 0.01, 8, 40), glow(PAL.accent[1], 1.6), [0, 0.3, Z + 0.012]));
+          g.add(cyl(0.028, 0.028, 0.02, key, [-0.13, 0.15, Z + 0.005], [Math.PI / 2, 0, 0], 20), cyl(0.028, 0.028, 0.02, key, [0.13, 0.15, Z + 0.005], [Math.PI / 2, 0, 0], 20), rbox(0.06, 0.03, 0.02, 0.012, key, [0, 0.1, Z + 0.005]));
+          // bumpers along the top edge, the triggers behind them, the USB-C port and the pairing button between them
+          for (const sx of [-1, 1]) {
+            g.add(rbox(0.42, 0.06, 0.16, 0.025, M.darkMetal, [sx * 0.45, 0.4, 0.02], [0, 0, -sx * 0.22]));
+            g.add(rbox(0.2, 0.15, 0.12, 0.04, M.darkMetal, [sx * 0.48, 0.42, -0.14], [-0.4, 0, -sx * 0.2]));
           }
+          g.add(rbox(0.06, 0.02, 0.025, 0.008, M.black, [0, 0.43, 0]), rbox(0.04, 0.02, 0.02, 0.008, key, [0.1, 0.43, -0.02]));
+          // the back: battery door and the grip texture lines
+          g.add(rbox(0.36, 0.24, 0.02, 0.04, M.darkMetal, [0, -0.06, -0.21]));
+          for (const sx of [-1, 1]) for (let k = 0; k < 6; k++) g.add(rbox(0.008, 0.18, 0.02, 0.003, M.darkMetal, [sx * (0.58 + k * 0.03), -0.36 + k * 0.01, -0.17], [0, 0, sx * 0.3]));
           g.rotation.x = -0.95; g.position.y = 0.42; return group(g);
         },
         car: () => hero(sedan()),
@@ -799,7 +955,7 @@
         const base = group(cyl(1.15, 1.2, 0.22, new THREE.MeshBasicMaterial({ color: new THREE.Color(PAL.bottom) }), [0, 0.11, 0], [0, 0, 0], 64), mesh(new THREE.TorusGeometry(1.17, 0.025, 8, 96), RING(c), [0, 0.22, 0], [Math.PI / 2, 0, 0]));
         base.position.copy(at); base.visible = ENV !== 'space'; world.add(base);   // nothing to stand on in orbit
         const obj = isSym ? SYM[kind](c) : OBJ[kind]();
-        neonize(obj, c);
+        neonize(obj, c, isSym || COLOUR.has(kind));
         const holder = new THREE.Group(); holder.add(obj); holder.position.copy(at).add(V(0, isSym ? 1.35 : 0.226, 0)); world.add(holder);
         const box = new THREE.Box3().setFromObject(holder), size = box.getSize(V()), h = Math.max(size.y, size.x * 0.8);
         const fit = isSym ? 1.3 / Math.max(size.x, size.y) : Math.min(1, 2.2 / Math.max(size.x, size.y));
@@ -977,7 +1133,7 @@
       // glass look but dimmer, so the objects the lines talk about stay the brightest things on screen ───
       const dress = (name, x, z, height, rot = 0) => {
         if (!OBJ[name]) return null;
-        const m = OBJ[name](); neonize(m, PAL.accent[0]);
+        const m = OBJ[name](); neonize(m, PAL.accent[0], COLOUR.has(name));
         if (m.userData.yawed) m.children[0].rotation.y = 0;
         const mats = new Set(); m.traverse(o => { if (o.material) mats.add(o.material); });   // parts share materials: dim each one once
         for (const mt of mats) { if (mt.uniforms && mt.uniforms.c) mt.uniforms.c.value.multiplyScalar(0.6); if (mt.isMeshPhysicalMaterial) { mt.color.multiplyScalar(0.6); mt.envMapIntensity = 0.5; } if (mt.isLineBasicMaterial) mt.opacity *= 0.55; if (mt.isMeshBasicMaterial && mt.map) mt.opacity *= 0.5; }
@@ -1108,6 +1264,25 @@
       }
     }
     caps.forEach((c, i) => { c.b = i + 1 < caps.length && caps[i + 1].a - c.b < 0.5 ? caps[i + 1].a : c.b + 0.25; });
+    // the follow moment: on the word "Follow" / "תעקבו" a profile card slides up, a hand taps its Follow button with a
+    // click, and the button turns into "Followed ✓" with a success chime
+    const last = SEGS[SEGS.length - 1], he = VIDEO.lang !== 'en';
+    const fcap = caps.filter(c => c.a >= last.a - 0.01).find(c => /follow|תעקבו|עקבו/i.test(c.e.inner.textContent));
+    const tapAt = fcap ? fcap.a + 0.35 : last.a + (last.b - last.a) * 0.6, cardAt = tapAt - 0.75;
+    const card = txt(root, '', { x: W / 2, y: 0.47 * H, size: 40, font: F.RUBIK, weight: 800, color: '#FFFFFF', dir: DIR,
+      css: { background: 'rgba(18,18,28,0.92)', borderRadius: '36px', padding: '26px 30px', boxShadow: `0 20px 60px rgba(0,0,0,0.5), 0 0 40px ${PAL.accent[0]}55`, border: '2px solid rgba(255,255,255,0.12)', zoom: '1.3' } });
+    card.inner.innerHTML = `<div style="display:flex;align-items:center;gap:26px;direction:ltr">
+      <div style="width:104px;height:104px;border-radius:50%;padding:5px;background:linear-gradient(45deg,#f9ce34,#ee2a7b,#6228d7)"><div style="width:100%;height:100%;border-radius:50%;background:#0b0a24;border:4px solid #12121c;display:flex;align-items:center;justify-content:center;font-size:30px;color:${PAL.accent[1]}">${he ? 'MTK' : 'MTK'}</div></div>
+      <div style="text-align:left"><div style="font-size:38px">${he ? 'mortoknow' : 'moretoknow1'}</div><div style="font-size:26px;font-weight:500;opacity:0.65">${he ? 'טכנולוגיה מבפנים' : 'Tech, from the inside'}</div></div>
+      <div class="fb" style="position:relative;min-width:250px;text-align:center;padding:18px 34px;border-radius:18px;background:#0095f6;font-size:40px">
+        <span class="f0">${he ? 'עקבו' : 'Follow'}</span><span class="f1" style="display:none">${he ? 'במעקב ✓' : 'Followed ✓'}</span></div></div>`;
+    const fbtn = card.inner.querySelector('.fb'), f0 = card.inner.querySelector('.f0'), f1 = card.inner.querySelector('.f1');
+    const hand = txt(root, '', { x: W / 2, y: 0.47 * H, size: 150, font: F.RUBIK, weight: 400, color: '#FFFFFF', css: { filter: 'drop-shadow(0 10px 18px rgba(0,0,0,0.6))' } });
+    // a tap cursor (drawn, so it needs no emoji font on the render machine) with the ripple of the tap
+    hand.inner.innerHTML = '<svg width="110" height="140" viewBox="0 0 22 28"><path d="M2 1 L2 21 L7 16.5 L10.5 25 L14 23.5 L10.6 15.2 L17 15.2 Z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+    const ripple = txt(root, '', { x: W / 2, y: 0.47 * H, size: 10, css: { width: '120px', height: '120px', borderRadius: '50%', border: '6px solid rgba(255,255,255,0.9)' } });
+    let bx = null;   // the button's centre from the card's centre, measured once the card is laid out
+    sfx(cardAt, 'whoosh', 0.6); sfx(tapAt, 'click', 1.2); sfx(tapAt + 0.05, 'pop', 0.8); sfx(tapAt + 0.12, 'success', 0.9);
     const COVER = !!window.COVER;
     const title = COVER ? txt(root, '', { x: W / 2, y: 0.68 * H, size: 120, font: F.RUBIK, weight: 900, color: '#FFFFFF', dir: DIR,
       css: { whiteSpace: 'normal', width: '900px', textAlign: 'center', lineHeight: 1.08, textShadow: `0 0 40px ${PAL.accent[0]}, 0 6px 0 #000` } }) : null;
@@ -1121,6 +1296,16 @@
         e.style.opacity = on ? 1 : 0; e.style.transform = `scale(${on ? lerp(2.2, big, sp(t, hwAt[k], 26, 0.45)) : 2.2})`; });
       for (const cp of caps) { const on = t >= cp.a && t < cp.b, hit = cp.e.inner.innerHTML.includes(PAL.hot);
         tf(cp.e, { o: on ? 1 : 0, s: on ? lerp(hit ? 0.45 : 0.75, hit ? 1.12 : 1, sp(t, cp.a, 30, hit ? 0.35 : 0.5)) : 1 }); }
+      const ci = E.o3(seg(t, cardAt, cardAt + 0.4));
+      tf(card, { o: ci, y: (1 - ci) * 160, s: lerp(0.85, 1, ci) });
+      const done = t >= tapAt;
+      f0.style.display = done ? 'none' : ''; f1.style.display = done ? '' : 'none';
+      fbtn.style.background = done ? '#363645' : '#0095f6';
+      fbtn.style.transform = `scale(${t < tapAt - 0.08 ? 1 : t < tapAt + 0.06 ? 0.88 : lerp(0.88, 1, sp(t, tapAt + 0.06, 24, 0.4))})`;
+      const hi = seg(t, tapAt - 0.55, tapAt - 0.08), press = t > tapAt - 0.08 && t < tapAt + 0.08 ? 1 : 0, out = seg(t, tapAt + 0.35, tapAt + 0.8);
+      if (bx === null && ci > 0) { const a = fbtn.getBoundingClientRect(), b = card.inner.getBoundingClientRect(), k = W / root.getBoundingClientRect().width; bx = ((a.left + a.right) - (b.left + b.right)) / 2 * k; }
+      const rp = seg(t, tapAt, tapAt + 0.45); tf(ripple, { o: rp > 0 && rp < 1 ? 1 - rp : 0, x: bx || 0, s: lerp(0.3, 1.6, rp) });
+      tf(hand, { o: Math.min(hi * 3, 1 - out), x: (bx || 0) + 55 + (1 - E.o3(hi)) * 220 + out * 120, y: 70 + (1 - E.o3(hi)) * 260 + out * 200, s: press ? 0.88 : 1 });
     };
   });
 })();
