@@ -818,10 +818,45 @@
           for (let k = 0; k < 4; k++) sfx(s.a + 0.4 + k * 0.7, 'swish', 0.3);
           return (u, on) => dots.forEach((d, k) => { d.visible = on; d.position.copy(curve.getPoint((u * 0.45 + k / dots.length) % 1)); });
         },
+        // the Grouper move: the object comes apart so you see how it's built. A flat thing (a phone, a board) separates
+        // into layers along its thin axis, front to back; a bulky one (a truck, a car) flies apart from its centre. Parts
+        // leave one after another, the object turns a little while it's open, and it closes again before the line ends.
         explode: (s, sp) => {
-          const kids = sp.obj.children.flatMap(c => c.isGroup ? c.children : [c]).map((c, k) => ({ c, o: c.position.clone(), d: V(Math.cos(k * 2.4), 0.6 + 0.4 * hash(k), Math.sin(k * 2.4)).multiplyScalar(0.35) }));
+          let root = sp.obj; while (root.children.length === 1 && root.children[0].isGroup) root = root.children[0];
+          const parts = root.children.filter(c => c.isMesh || c.isGroup);
+          if (parts.length < 8) return ACT.spin(s, sp);   // the writer chose to open it, but a model with only a few parts has nothing inside to show
+          root.updateMatrixWorld(true);
+          const inv = root.matrixWorld.clone().invert(), all = new THREE.Box3();
+          const info = parts.map(c => { const b = new THREE.Box3().setFromObject(c).applyMatrix4(inv); all.union(b); return { c, o: c.position.clone(), m: b.getCenter(V()) }; });
+          const size = all.getSize(V()), mid = all.getCenter(V()), dims = [size.x, size.y, size.z], big = Math.max(...dims, 1e-6);
+          const axis = dims.indexOf(Math.min(...dims)), flat = Math.min(...dims) / big < 0.3, unit = [V(1, 0, 0), V(0, 1, 0), V(0, 0, 1)][axis];
+          if (flat) {
+            // layers: parts at (about) the same depth move together, the layers spread evenly over up to 1.1 units
+            const depth = i => Math.round(info[i].m.getComponent(axis) / (big * 0.012));
+            const levels = [...new Set(info.map((_, i) => depth(i)))].sort((x, y) => x - y);
+            info.forEach((p, i) => {
+              const L = levels.length > 1 ? levels.indexOf(depth(i)) / (levels.length - 1) - 0.5 : 0;
+              const side = p.m.clone().sub(mid); side.setComponent(axis, 0);
+              p.d = unit.clone().multiplyScalar(L * Math.min(big * 0.9, 1.1)).addScaledVector(side, 0.15); p.delay = (L + 0.5) * 0.3;
+            });
+          } else {
+            info.forEach((p, i) => {
+              const off = p.m.clone().sub(mid), r = off.length() / (big * 0.5);
+              p.d = off.lengthSq() < 1e-6 ? V(0, 0.1 * big, 0) : off.normalize().multiplyScalar(big * (0.05 + 0.16 * r)).add(V(0, 0.04 * big * (i % 3), 0));
+              p.delay = 0.3 * Math.min(1, r);
+            });
+          }
+          const low = Math.min(...info.map(p => p.d.y));   // nothing sinks into the floor: the whole explosion lifts instead
+          if (low < 0) info.forEach(p => { p.d.y -= low; });
+          const turn = flat && axis === 2 ? 1.05 : 0.45;   // layers that stack toward the camera are seen from the side
           sfx(s.a + 0.3, 'whoosh', 0.5);
-          return (u) => { const f = E.io3(seg(u, 0.2, 0.9)) * (1 - E.io3(seg(u, (s.end - s.a) - 0.7, (s.end - s.a) - 0.1))); kids.forEach(({ c, o, d }) => c.position.copy(o).addScaledVector(d, f)); };
+          const len = s.end - s.a;
+          return (u) => {
+            const close = E.io3(seg(u, len - 0.75, len - 0.1));
+            let open = 0;
+            info.forEach(p => { const f = E.io3(seg(u, 0.2 + p.delay, 1.1 + p.delay)) * (1 - close); open = Math.max(open, f); p.c.position.copy(p.o).addScaledVector(p.d, f); });
+            sp.holder.rotation.y = sp.base + turn * open;
+          };
         },
         count: (s, sp) => {
           const value = Number(s.value) || 0, fmt = v => (Math.abs(value) >= 100 ? Math.round(v).toLocaleString('en-US') : String(Math.round(v * 10) / 10)) + (s.suffix || '');

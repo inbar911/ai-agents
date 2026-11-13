@@ -36,7 +36,10 @@ ACTIONS = {
     "spin": "the object turns around (looking at it from all sides)",
     "waves": "signal rings spread out of the object (broadcasting, wireless, sound)",
     "beam": "a stream of glowing dots flows from focus to target (data / signal / power travelling); needs target",
-    "explode": "the object's parts separate to show the inside, then close again",
+    "explode": ("the object comes apart in layers so the viewer sees what's inside and how it's built, then closes again. "
+                "YOU decide if it fits: only when the line is about what's inside the object or how it works inside, and the object "
+                "really has an inside worth showing (a phone, a chip, a laptop, a battery...). A line about what a truck carries, "
+                "a car driving or a building's size does NOT come apart: use show/spin/pulse there. Usually once per video at most"),
     "count": "a big number counts up above the object; needs value (number) and optional suffix like '%', 'x', '+'",
     "yes": "a check mark appears (it works / the answer)",
     "no": "a red X appears (myth / wrong / blocked)",
