@@ -174,6 +174,84 @@
       });
       const earthMask = await new THREE.TextureLoader().loadAsync('textures/earth.jpg');   // NASA land mask (via three.js examples)
       earthMask.colorSpace = THREE.SRGBColorSpace;
+      // ─── vehicles and buildings: a vehicle is its side profile (wheel arches cut in) extruded across its width, a building
+      // is a volume with its facades drawn on canvases (dark and lit windows, the same every frame) ───
+      const prof = (cmds) => {
+        const s = new THREE.Shape();
+        cmds.forEach((c, k) => {
+          if (c[0] === 'q') s.quadraticCurveTo(c[1], c[2], c[3], c[4]);
+          else if (c[0] === 'a') { const [, cx, cy, r, yb] = c; s.lineTo(cx - r, yb); s.lineTo(cx - r, cy); s.absarc(cx, cy, r, Math.PI, 0, true); s.lineTo(cx + r, yb); }
+          else if (k === 0) s.moveTo(c[0], c[1]); else s.lineTo(c[0], c[1]);
+        });
+        return s;
+      };
+      const extrudeZ = (shape, width, bev, mat) => {
+        const d = Math.max(0.002, width - 2 * bev);
+        const g = new THREE.ExtrudeGeometry(shape, { depth: d, bevelEnabled: bev > 0, bevelThickness: bev, bevelSize: bev, bevelSegments: 4, curveSegments: 20 });
+        g.translate(0, 0, -d / 2); return mesh(g, mat);
+      };
+      const sideFlat = (cmds, z, mat) => { const m = mesh(new THREE.ShapeGeometry(prof(cmds), 12), mat, [0, 0, z]); if (z < 0) m.scale.z = -1; return m; };   // a side window
+      const seam = (x, y, h, z) => rbox(0.004, h, 0.004, 0.001, M.black, [x, y, z]);                                                   // a door gap
+      const wheel = (R, w, at, spokes = 5) => {
+        const g = group(cyl(R, R, w, M.black, [0, 0, 0], [Math.PI / 2, 0, 0], 40), cyl(R * 0.68, R * 0.68, w + 0.004, M.darkMetal, [0, 0, 0], [Math.PI / 2, 0, 0], 32),
+          cyl(R * 0.16, R * 0.16, w + 0.012, M.chrome, [0, 0, 0], [Math.PI / 2, 0, 0], 16));
+        for (let k = 0; k < spokes; k++) { const a = k * Math.PI * 2 / spokes; g.add(rbox(R * 0.13, R * 0.5, 0.01, 0.004, M.alu, [Math.sin(a) * R * 0.38, Math.cos(a) * R * 0.38, w / 2 + 0.004], [0, 0, -a])); }
+        g.position.set(...at); if (at[2] < 0) g.scale.z = -1; return g;
+      };
+      // vehicles stand three-quarter on, nose to the camera, a little smaller than their 2 m length so they fit the 9:16 frame;
+      // dress() turns them back square for parking along a street
+      const hero = (g) => { g.rotation.y = -0.6; g.scale.setScalar(0.85); const o = group(g); o.userData.yawed = true; return o; };
+      const carPaint = () => new THREE.MeshPhysicalMaterial({ color: new THREE.Color(PAL.accent[1]), metalness: 0.5, roughness: 0.25, clearcoat: 1 });
+      const LAMP = '#f4f1ff', TAIL = '#ff3b4e';
+      const FT = {};   // facade textures are shared: a city street dresses the same building many times
+      const ftex = (key, cols, rows, kind, seed) => FT[key] || (FT[key] = tex(cols * 40, rows * 40, (x, w, h) => {
+        x.fillStyle = '#000'; x.fillRect(0, 0, w, h);
+        const cw = w / cols, rh = h / rows;
+        for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+          x.fillStyle = hash(seed + r * 31 + c * 7) > 0.74 ? 'rgba(236,233,255,1)' : 'rgba(150,142,255,0.55)';   // about a quarter lit
+          if (kind === 'curtain') x.fillRect(c * cw + 2, r * rh + 3, cw - 4, rh - 9);                // glass mullion to mullion, a spandrel per floor
+          else if (kind === 'ribbon') x.fillRect(c * cw, r * rh + rh * 0.3, cw - 1, rh * 0.5);        // strip windows
+          else x.fillRect(c * cw + cw * 0.22, r * rh + rh * 0.2, cw * 0.56, rh * 0.58);               // punched windows
+        }
+      }));
+      const facadeMat = t => new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffffff, emissiveMap: t });
+      const block = (w, h, d, y0, front, side) => {
+        const g = group(mesh(new THREE.BoxGeometry(w, h, d), M.glass, [0, y0 + h / 2, 0]));
+        [[0, 0, d / 2 + 0.003, w, front], [Math.PI, 0, -d / 2 - 0.003, w, front], [Math.PI / 2, w / 2 + 0.003, 0, d, side || front], [-Math.PI / 2, -w / 2 - 0.003, 0, d, side || front]]
+          .forEach(([ry, x, z, pw, t]) => g.add(plane(pw * 0.98, h * 0.98, facadeMat(t), [x, y0 + h / 2, z], [0, ry, 0])));
+        return g;
+      };
+      const winFrame = (x, y, z, w, h, lit) => group(rbox(w + 0.03, h + 0.03, 0.012, 0.004, M.white, [x, y, z]), rbox(w, h, 0.016, 0.003, lit ? glow('#e2deff', 1.1) : M.lens, [x, y, z + 0.003]),
+        rbox(0.01, h, 0.02, 0.002, M.white, [x, y, z + 0.005]), rbox(w, 0.01, 0.02, 0.002, M.white, [x, y, z + 0.005]));
+      // a sedan in the proportions of a Model 3 class car (4720 x 1850 x 1441 mm, 1 unit = 2.4 m): fastback roof, flush
+      // handles, a full-width tail light bar. No logos.
+      const sedan = () => {
+        const R = 0.142, paint = carPaint();
+        const g = group(
+          extrudeZ(prof([[-0.93, 0.10], ['a', -0.58, R, 0.21, 0.10], ['a', 0.62, R, 0.21, 0.10], [0.92, 0.10], ['q', 0.95, 0.12, 0.95, 0.20], ['q', 0.95, 0.27, 0.90, 0.29],
+            ['q', 0.62, 0.33, 0.32, 0.385], [-0.62, 0.40], ['q', -0.86, 0.405, -0.93, 0.36], ['q', -0.955, 0.30, -0.945, 0.20], ['q', -0.945, 0.12, -0.93, 0.10]]), 0.77, 0.04, paint),
+          extrudeZ(prof([[0.30, 0.37], ['q', 0.17, 0.50, 0.04, 0.55], ['q', -0.15, 0.565, -0.34, 0.545], ['q', -0.62, 0.48, -0.80, 0.39], [-0.80, 0.37]]), 0.64, 0.05, M.glass));
+        for (const s of [1, -1]) {
+          g.add(sideFlat([[0.25, 0.40], ['q', 0.15, 0.49, 0.04, 0.525], [-0.13, 0.53], [-0.13, 0.40]], s * 0.322, M.lens),
+            sideFlat([[-0.16, 0.40], [-0.16, 0.53], ['q', -0.36, 0.53, -0.50, 0.49], ['q', -0.62, 0.44, -0.68, 0.40]], s * 0.322, M.lens));
+          for (const x of [0.32, -0.13, -0.52]) g.add(seam(x, 0.25, 0.26, s * 0.386));
+          for (const x of [0.12, -0.27]) g.add(rbox(0.06, 0.012, 0.006, 0.003, M.chrome, [x, 0.37, s * 0.387]));
+          g.add(rbox(0.06, 0.022, 0.2, 0.01, glow(LAMP, 2.5), [0.925, 0.305, s * 0.25], [0, 0, -0.35]), rbox(0.06, 0.04, 0.08, 0.015, M.black, [0.27, 0.45, s * 0.42]));
+          g.add(wheel(R, 0.09, [0.62, R, s * 0.33]), wheel(R, 0.09, [-0.58, R, s * 0.33]));
+        }
+        g.add(rbox(0.02, 0.05, 0.42, 0.01, M.black, [0.985, 0.15, 0]), rbox(0.02, 0.025, 0.68, 0.01, glow(TAIL, 2), [-0.975, 0.335, 0]));
+        return g;
+      };
+      // a 3- to 4-storey city block of the classic kind: a lit shop floor with awnings, punched windows with sills, a cornice
+      const cityBlock = (w, d, floors, cols, seed) => {
+        const fh = 0.24, top = 0.3 + floors * fh;
+        const g = group(mesh(new THREE.BoxGeometry(w - 0.04, 0.3, d - 0.04), M.glass, [0, 0.15, 0]), plane(w * 0.9, 0.2, facadeMat(ftex('shop', 6, 1, 'curtain', 5)), [0, 0.13, d / 2 - 0.015]),
+          block(w, floors * fh, d, 0.3, ftex('cbF' + seed, cols, floors, 'punched', seed), ftex('cbS' + seed, Math.max(2, Math.round(cols * d / w)), floors, 'punched', seed + 5)),
+          rbox(w + 0.03, 0.02, d + 0.03, 0.005, M.white, [0, 0.3, 0]), rbox(w + 0.07, 0.045, d + 0.07, 0.01, M.white, [0, top + 0.022, 0]));
+        for (let k = 0; k < 3; k++) g.add(rbox(w * 0.26, 0.01, 0.13, 0.004, M.white, [(k - 1) * w * 0.32, 0.27, d / 2 + 0.055], [0.4, 0, 0]));   // awnings
+        for (let r = 0; r < floors; r++) for (let c = 0; c < cols; c++) g.add(rbox(w / cols * 0.62, 0.008, 0.025, 0.003, M.white, [-w / 2 + (c + 0.5) * w / cols, top - r * fh - 0.78 * fh, d / 2 + 0.012]));   // sills
+        return g;
+      };
 
       // ─── the object library. Each builder returns a group sitting on y = 0, about 1-2 units tall ───
       const OBJ = {
@@ -340,20 +418,153 @@
           }
           g.rotation.x = -0.95; g.position.y = 0.42; return group(g);
         },
-        car: () => {
-          const paint = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(PAL.accent[1]), metalness: 0.5, roughness: 0.25, clearcoat: 1 });
-          const g = group(rbox(2.2, 0.5, 1.0, 0.18, paint, [0, 0.45, 0]), rbox(1.2, 0.45, 0.9, 0.2, M.glass, [-0.1, 0.85, 0]));
-          [[-0.7, 0.5], [0.7, 0.5], [-0.7, -0.5], [0.7, -0.5]].forEach(([x, z]) => g.add(cyl(0.24, 0.24, 0.16, M.black, [x, 0.24, z], [Math.PI / 2, 0, 0]), cyl(0.13, 0.13, 0.17, M.chrome, [x, 0.24, z], [Math.PI / 2, 0, 0])));
-          g.add(sph(0.07, glow('#fff7cc', 2.5), [1.1, 0.5, 0.32]), sph(0.07, glow('#fff7cc', 2.5), [1.1, 0.5, -0.32]));
+        car: () => hero(sedan()),
+        police_car: () => {
+          const g = sedan();
+          g.add(rbox(0.12, 0.03, 0.52, 0.01, M.black, [-0.12, 0.615, 0]), rbox(0.1, 0.03, 0.22, 0.01, glow(TAIL, 2.5), [-0.12, 0.64, 0.125]), rbox(0.1, 0.03, 0.22, 0.01, glow('#4d7bff', 2.5), [-0.12, 0.64, -0.125]),
+            rbox(0.03, 0.17, 0.5, 0.01, M.black, [1.0, 0.19, 0]), cyl(0.004, 0.004, 0.3, M.black, [-0.82, 0.55, 0.2]));
+          return hero(g);
+        },
+        // a rear-engined sports coupe (4519 x 1852 x 1298 mm, 1 unit = 2.3 m): long sloping roofline, oval lamps, big wheels, a
+        // ducktail spoiler. No logos.
+        sports_car: () => {
+          const R = 0.152, paint = carPaint();
+          const g = group(
+            extrudeZ(prof([[-0.90, 0.09], ['a', -0.515, R, 0.225, 0.09], ['a', 0.55, R, 0.225, 0.09], [0.90, 0.09], ['q', 0.94, 0.10, 0.94, 0.17], ['q', 0.93, 0.23, 0.85, 0.25],
+              ['q', 0.55, 0.30, 0.25, 0.34], [-0.35, 0.35], ['q', -0.80, 0.33, -0.92, 0.24], ['q', -0.945, 0.15, -0.90, 0.09]]), 0.80, 0.05, paint),
+            extrudeZ(prof([[0.27, 0.32], ['q', 0.10, 0.46, -0.05, 0.49], ['q', -0.25, 0.51, -0.42, 0.46], ['q', -0.70, 0.36, -0.86, 0.27], [-0.40, 0.30]]), 0.62, 0.05, M.glass),
+            rbox(0.08, 0.012, 0.66, 0.004, paint, [-0.9, 0.335, 0], [0, 0, 0.25]), rbox(0.02, 0.025, 0.7, 0.01, glow(TAIL, 2), [-0.94, 0.27, 0]),
+            rbox(0.02, 0.05, 0.5, 0.01, M.black, [0.94, 0.13, 0]));
+          for (const s of [1, -1]) {
+            g.add(sideFlat([[0.22, 0.36], ['q', 0.09, 0.45, -0.05, 0.46], ['q', -0.25, 0.47, -0.40, 0.43], ['q', -0.52, 0.38, -0.56, 0.36]], s * 0.312, M.lens));
+            g.add(seam(0.26, 0.22, 0.22, s * 0.401), seam(-0.24, 0.22, 0.22, s * 0.401), rbox(0.12, 0.05, 0.01, 0.005, M.black, [-0.33, 0.25, s * 0.401]));
+            const lamp = mesh(new THREE.SphereGeometry(0.06, 24, 16), glow(LAMP, 2.2), [0.86, 0.26, s * 0.27]); lamp.scale.set(0.6, 0.8, 1); g.add(lamp);
+            g.add(rbox(0.05, 0.035, 0.07, 0.012, M.black, [0.2, 0.37, s * 0.41]), wheel(R, 0.1, [0.55, R, s * 0.34]), wheel(R, 0.11, [-0.515, R, s * 0.34]));
+          }
+          return hero(g);
+        },
+        // a full-size crew-cab pickup (5890 x 2030 x 1960 mm, 1 unit = 2.95 m): tall square nose, big grille, an open bed with
+        // the wheel wells inside it, 33-inch tyres. No logos.
+        pickup_truck: () => {
+          const R = 0.142, paint = carPaint();
+          const g = group(
+            extrudeZ(prof([[-0.95, 0.16], ['a', -0.57, R, 0.185, 0.16], ['a', 0.68, R, 0.185, 0.16], [0.955, 0.16], [0.955, 0.43], ['q', 0.70, 0.445, 0.40, 0.445], [-0.27, 0.445], [-0.27, 0.35], [-0.95, 0.35]]), 0.69, 0.02, paint),
+            extrudeZ(prof([[0.40, 0.42], [0.21, 0.635], [-0.25, 0.64], [-0.25, 0.42]]), 0.66, 0.03, M.glass),
+            rbox(0.03, 0.12, 0.69, 0.01, paint, [-0.955, 0.42, 0]),
+            rbox(0.02, 0.2, 0.56, 0.01, M.darkMetal, [0.98, 0.33, 0]), rbox(0.05, 0.07, 0.72, 0.02, M.chrome, [0.985, 0.19, 0]), rbox(0.05, 0.06, 0.7, 0.02, M.chrome, [-0.975, 0.2, 0]));
+          for (const y of [0.27, 0.33, 0.39]) g.add(rbox(0.012, 0.012, 0.54, 0.004, M.chrome, [0.992, y, 0]));
+          for (const s of [1, -1]) {
+            g.add(rbox(0.66, 0.12, 0.03, 0.01, paint, [-0.62, 0.42, s * 0.33]), rbox(0.37, 0.05, 0.12, 0.02, paint, [-0.57, 0.39, s * 0.26]));   // bed walls, wheel wells
+            g.add(sideFlat([[0.34, 0.47], [0.21, 0.61], [0.0, 0.61], [0.0, 0.47]], s * 0.331, M.lens), sideFlat([[-0.03, 0.47], [-0.03, 0.61], [-0.22, 0.61], [-0.22, 0.47]], s * 0.331, M.lens));
+            for (const x of [0.40, 0.0, -0.27]) g.add(seam(x, 0.3, 0.24, s * 0.346));
+            g.add(rbox(0.02, 0.05, 0.1, 0.01, glow(LAMP, 2.5), [0.985, 0.40, s * 0.27]), rbox(0.02, 0.1, 0.03, 0.008, glow(TAIL, 2), [-0.975, 0.41, s * 0.32]),
+              rbox(0.05, 0.07, 0.06, 0.015, M.black, [0.33, 0.5, s * 0.38]), wheel(R, 0.1, [0.68, R, s * 0.30], 6), wheel(R, 0.1, [-0.57, R, s * 0.30], 6));
+          }
+          return hero(g);
+        },
+        // a cab-over box truck (6600 x 2300 x 3400 mm, 1 unit = 3.4 m): a short flat-nosed cab, wind deflector, a tall box with
+        // a roll-up rear door, dual rear wheels. No logos.
+        delivery_truck: () => {
+          const R = 0.118, paint = carPaint();
+          const g = group(
+            extrudeZ(prof([[0.42, 0.17], ['a', 0.62, R, 0.155, 0.17], [0.935, 0.17], [0.94, 0.40], ['q', 0.945, 0.44, 0.925, 0.46], [0.895, 0.655], ['q', 0.885, 0.685, 0.85, 0.685], [0.44, 0.685]]), 0.66, 0.03, paint),
+            extrudeZ(prof([[0.44, 0.71], [0.80, 0.71], [0.44, 0.90]]), 0.6, 0.01, paint),
+            rbox(1.30, 0.75, 0.68, 0.015, M.white, [-0.30, 0.625, 0]), rbox(0.008, 0.70, 0.62, 0.003, M.alu, [-0.952, 0.625, 0]),
+            rbox(0.01, 0.18, 0.56, 0.01, M.lens, [0.942, 0.56, 0], [0, 0, 0.15]), rbox(0.012, 0.1, 0.36, 0.005, M.darkMetal, [0.97, 0.30, 0]),
+            rbox(0.07, 0.07, 0.7, 0.015, M.darkMetal, [0.95, 0.17, 0]));
+          for (let k = 1; k < 8; k++) g.add(rbox(0.012, 0.006, 0.62, 0.002, M.white, [-0.956, 0.27 + k * 0.088, 0]));   // the roll-up door's slats
+          for (const s of [1, -1]) {
+            g.add(rbox(1.85, 0.05, 0.05, 0.01, M.black, [-0.05, 0.20, s * 0.2]));
+            g.add(sideFlat([[0.86, 0.47], [0.87, 0.64], [0.62, 0.64], [0.62, 0.47]], s * 0.331, M.lens), seam(0.58, 0.43, 0.4, s * 0.331));
+            g.add(rbox(0.012, 0.045, 0.11, 0.006, glow(LAMP, 2.5), [0.972, 0.36, s * 0.24]), rbox(0.01, 0.06, 0.04, 0.005, glow(TAIL, 2), [-0.955, 0.30, s * 0.3]));
+            g.add(rbox(0.03, 0.11, 0.035, 0.008, M.black, [0.90, 0.56, s * 0.40]), rbox(0.01, 0.01, 0.08, 0.003, M.black, [0.90, 0.62, s * 0.36]));
+            for (const x of [-0.8, -0.3, 0.2]) g.add(rbox(0.03, 0.015, 0.006, 0.002, glow('#ffb340', 1.5), [x, 0.28, s * 0.343]));
+            g.add(cyl(0.06, 0.06, 0.24, M.alu, [0.18, 0.17, s * 0.27], [0, 0, Math.PI / 2]), rbox(0.01, 0.1, 0.1, 0.003, M.black, [-0.66, 0.1, s * 0.27]));
+            g.add(wheel(R, 0.07, [0.62, R, s * 0.29]), wheel(R, 0.065, [-0.50, R, s * 0.30]), wheel(R, 0.065, [-0.50, R, s * 0.225]));
+          }
+          return hero(g);
+        },
+        // a long-hood sleeper tractor (7500 x 2600 x 4100 mm, 1 unit = 3.9 m): sloped hood, raised-roof sleeper, chrome grille,
+        // bumper, fuel tanks and exhaust stacks, tandem drive axles with duals, the fifth wheel. No logos.
+        semi_truck: () => {
+          const R = 0.133, paint = carPaint();
+          const g = group(
+            extrudeZ(prof([[0.32, 0.22], [0.94, 0.22], [0.945, 0.40], ['q', 0.945, 0.43, 0.90, 0.44], [0.40, 0.52], [0.32, 0.52]]), 0.52, 0.03, paint),
+            extrudeZ(prof([[0.34, 0.20], [0.34, 0.50], [0.22, 0.76], ['q', 0.15, 0.795, 0.04, 0.80], ['q', -0.08, 0.81, -0.17, 0.97], [-0.42, 0.99], [-0.43, 0.20]]), 0.67, 0.03, paint),
+            rbox(0.012, 0.17, 0.30, 0.006, M.chrome, [0.977, 0.31, 0]), rbox(0.06, 0.09, 0.64, 0.02, M.chrome, [0.975, 0.17, 0]),
+            cyl(0.12, 0.12, 0.03, M.darkMetal, [-0.63, 0.26, 0], undefined, 32));
+          for (let k = 0; k < 5; k++) g.add(rbox(0.014, 0.008, 0.28, 0.003, M.black, [0.979, 0.25 + k * 0.03, 0]));
+          for (const s of [1, -1]) {
+            g.add(rbox(1.45, 0.05, 0.05, 0.01, M.black, [-0.25, 0.20, s * 0.17]));
+            g.add(mesh(new THREE.CylinderGeometry(R + 0.035, R + 0.035, 0.11, 24, 1, true, Math.PI / 2, Math.PI), paint, [0.70, R, s * 0.29], [Math.PI / 2, 0, 0]));   // front fender
+            g.add(sideFlat([[0.31, 0.53], [0.215, 0.74], [0.03, 0.74], [0.03, 0.53]], s * 0.336, M.lens), seam(0.0, 0.5, 0.5, s * 0.336), seam(-0.12, 0.55, 0.6, s * 0.336));
+            g.add(rbox(0.02, 0.04, 0.09, 0.008, glow(LAMP, 2.5), [0.965, 0.40, s * 0.21]));
+            g.add(rbox(0.03, 0.14, 0.05, 0.01, M.black, [0.37, 0.62, s * 0.40]), rbox(0.01, 0.01, 0.09, 0.003, M.black, [0.37, 0.66, s * 0.36]));
+            g.add(cyl(0.075, 0.075, 0.32, M.chrome, [0.12, 0.17, s * 0.30], [0, 0, Math.PI / 2]), cyl(0.018, 0.018, 0.8, M.chrome, [-0.47, 0.62, s * 0.30], undefined, 16));
+            g.add(rbox(0.01, 0.13, 0.12, 0.003, M.black, [-0.95, 0.12, s * 0.30]));
+            g.add(wheel(R, 0.08, [0.70, R, s * 0.29], 8));
+            for (const x of [-0.45, -0.78]) g.add(wheel(R, 0.06, [x, R, s * 0.30], 8), wheel(R, 0.06, [x, R, s * 0.235], 8));
+          }
+          return hero(g);
+        },
+        // a ~300 m office supertall (1 unit = 150 m): podium, three setback tiers in a glass curtain wall, a crown and spire
+        skyscraper: () => group(block(0.56, 0.12, 0.56, 0, ftex('skyP', 8, 2, 'ribbon', 3)), block(0.38, 0.95, 0.38, 0.12, ftex('sky1', 10, 32, 'curtain', 11)),
+          rbox(0.40, 0.012, 0.40, 0.004, M.white, [0, 1.07, 0]), block(0.32, 0.5, 0.32, 1.07, ftex('sky2', 8, 17, 'curtain', 13)),
+          rbox(0.34, 0.012, 0.34, 0.004, M.white, [0, 1.57, 0]), block(0.26, 0.25, 0.26, 1.57, ftex('sky3', 6, 8, 'curtain', 17)),
+          rbox(0.28, 0.012, 0.28, 0.004, M.white, [0, 1.82, 0]), ...[[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => rbox(0.012, 0.12, 0.012, 0.003, M.white, [a * 0.12, 1.88, b * 0.12])),
+          cyl(0.006, 0.014, 0.22, M.chrome, [0, 2.0, 0], undefined, 12), sph(0.012, glow(TAIL, 3), [0, 2.12, 0])),
+        // a twisting glass tower: 36 floor plates, each turned 1.4 degrees on the one below (90 degrees over the height)
+        glass_skyscraper: () => {
+          const g = group();
+          for (let k = 0; k < 36; k++) { const f = group(mesh(new THREE.BoxGeometry(0.44, 0.042, 0.30), M.glass), rbox(0.46, 0.008, 0.32, 0.003, M.white, [0, 0.025, 0])); f.position.y = 0.05 + k * 0.05; f.rotation.y = k * 0.025; g.add(f); }
           return g;
         },
+        // an 11-storey office block (60 x 30 x 44 m, 1 unit = 40 m): ribbon windows, a glass lobby with a canopy, rooftop plant
+        office_building: () => group(block(1.5, 1.0, 0.75, 0.1, ftex('offF', 14, 10, 'ribbon', 21), ftex('offS', 7, 10, 'ribbon', 23)),
+          mesh(new THREE.BoxGeometry(1.46, 0.1, 0.71), M.glass, [0, 0.05, 0]), plane(1.4, 0.09, facadeMat(ftex('lobby', 10, 1, 'curtain', 9)), [0, 0.05, 0.357]),
+          rbox(0.5, 0.015, 0.16, 0.004, M.white, [0, 0.11, 0.43]), rbox(1.52, 0.03, 0.77, 0.005, M.alu, [0, 1.115, 0]),
+          rbox(0.3, 0.08, 0.2, 0.01, M.darkMetal, [-0.4, 1.17, -0.1]), rbox(0.2, 0.06, 0.2, 0.01, M.darkMetal, [0.3, 1.16, 0.1]), cyl(0.05, 0.05, 0.03, M.alu, [0.3, 1.205, 0.1])),
+        // a 9-storey Israeli apartment block (24 x 14 x 30 m, 1 unit = 17 m): on columns (pilotis), a balcony pair per floor
+        // with glass rails, solar water heaters and the lift room on the roof
+        apartment_building: () => {
+          const g = group(mesh(new THREE.BoxGeometry(0.4, 0.19, 0.3), M.glass, [0, 0.095, 0]), block(1.4, 1.53, 0.82, 0.19, ftex('aptF', 8, 9, 'punched', 31), ftex('aptS', 5, 9, 'punched', 33)),
+            rbox(1.42, 0.03, 0.84, 0.005, M.alu, [0, 1.735, 0]), rbox(0.3, 0.12, 0.25, 0.01, M.glass, [0.4, 1.78, -0.15]));
+          for (const x of [-0.6, -0.2, 0.2, 0.6]) for (const z of [-0.3, 0.3]) g.add(cyl(0.025, 0.025, 0.19, M.alu, [x, 0.095, z], undefined, 12));
+          for (let k = 0; k < 9; k++) for (const x of [-0.4, 0.4]) { const y = 0.19 + k * 0.17; g.add(rbox(0.42, 0.012, 0.13, 0.003, M.white, [x, y + 0.006, 0.475]), rbox(0.42, 0.055, 0.006, 0.002, M.lens, [x, y + 0.04, 0.537])); }
+          for (const x of [-0.5, -0.3, -0.1, 0.1]) g.add(rbox(0.16, 0.006, 0.12, 0.002, M.darkMetal, [x, 1.79, 0.12], [-0.6, 0, 0]), cyl(0.03, 0.03, 0.16, M.white, [x, 1.81, 0.0], [0, 0, Math.PI / 2], 16));
+          return g;
+        },
+        city_building: () => cityBlock(1.5, 1.0, 5, 6, 41),
+        city_building_color: () => { const g = cityBlock(0.95, 0.9, 6, 4, 61); g.add(rbox(0.3, 1.34, 0.1, 0.01, M.glass, [0, 1.0, 0.5])); return g; },
+        // a 30-storey residential tower (30 x 25 x 100 m, 1 unit = 60 m): a balcony ring at every floor, a lit crown
+        tower_building: () => {
+          const g = group(mesh(new THREE.BoxGeometry(0.56, 0.08, 0.48), M.glass, [0, 0.04, 0]), block(0.52, 1.65, 0.44, 0.08, ftex('twF', 6, 30, 'punched', 71), ftex('twS', 5, 30, 'punched', 73)),
+            rbox(0.5, 0.08, 0.42, 0.005, M.glass, [0, 1.77, 0]), rbox(0.56, 0.008, 0.48, 0.003, M.white, [0, 1.82, 0]));
+          for (let k = 1; k < 30; k++) g.add(rbox(0.58, 0.006, 0.5, 0.003, M.white, [0, 0.08 + k * 0.055, 0]));
+          return g;
+        },
+        // a two-storey family house (12 x 9 m, 7.5 m to the ridge, 1 unit = 7 m): gable roof with overhangs, chimney, framed
+        // windows (two lit), a porch over the door and an attached garage
         house: () => {
-          const roof = mesh(new THREE.CylinderGeometry(0.01, 1.25, 0.8, 4), plastic(PAL.accent[1]), [0, 1.6, 0], [0, Math.PI / 4, 0]);
-          return group(rbox(1.6, 1.2, 1.4, 0.04, M.white, [0, 0.6, 0]), roof, rbox(0.34, 0.6, 0.04, 0.02, plastic(PAL.accent[0]), [0.35, 0.3, 0.71]),
-            rbox(0.4, 0.34, 0.04, 0.02, glow('#ffe08a', 1.2), [-0.4, 0.75, 0.71]));
+          const gable = extrudeZ(prof([[-0.625, 0.8], [0.625, 0.8], [0, 1.22]]), 1.7, 0, M.glass); gable.rotation.y = Math.PI / 2;
+          const g = group(mesh(new THREE.BoxGeometry(1.7, 0.8, 1.25), M.glass, [0, 0.4, 0]), gable,
+            rbox(1.84, 0.035, 0.85, 0.01, M.darkMetal, [0, 1.0, 0.3525], [0.592, 0, 0]), rbox(1.84, 0.035, 0.85, 0.01, M.darkMetal, [0, 1.0, -0.3525], [-0.592, 0, 0]),
+            rbox(1.84, 0.02, 0.04, 0.005, M.darkMetal, [0, 1.235, 0]), rbox(0.14, 0.4, 0.14, 0.01, M.glass, [0.55, 1.15, -0.2]),
+            rbox(0.2, 0.38, 0.02, 0.01, M.darkMetal, [-0.15, 0.19, 0.632]), rbox(0.42, 0.02, 0.2, 0.005, M.white, [-0.15, 0.44, 0.73], [0.12, 0, 0]),
+            cyl(0.012, 0.012, 0.43, M.white, [-0.33, 0.215, 0.82], undefined, 8), cyl(0.012, 0.012, 0.43, M.white, [0.03, 0.215, 0.82], undefined, 8),
+            rbox(0.32, 0.04, 0.12, 0.005, M.alu, [-0.15, 0.02, 0.69]),
+            mesh(new THREE.BoxGeometry(0.6, 0.55, 0.9), M.glass, [1.15, 0.275, 0.175]), rbox(0.64, 0.03, 0.94, 0.005, M.darkMetal, [1.15, 0.565, 0.175]),
+            rbox(0.48, 0.38, 0.02, 0.005, M.alu, [1.15, 0.19, 0.628]),
+            ...[[0.35, 0.36, true], [-0.55, 0.36, false], [-0.55, 0.63, false], [-0.15, 0.63, true], [0.35, 0.63, false]].map(([x, y, lit]) => winFrame(x, y, 0.632, 0.24, 0.2, lit)));
+          for (let k = 1; k < 5; k++) g.add(rbox(0.48, 0.006, 0.025, 0.002, M.white, [1.15, k * 0.076, 0.632]));
+          g.scale.setScalar(0.85); g.position.x = -0.25; return group(g);
         },
       };
 
+      // buildings stand three-quarter on too (a facade straight on reads as a flat card)
+      for (const n of ['skyscraper', 'glass_skyscraper', 'office_building', 'apartment_building', 'city_building', 'city_building_color', 'tower_building', 'house']) {
+        const make = OBJ[n]; OBJ[n] = () => { const g = make(); g.rotation.y = -0.5; return group(g); };
+      }
       // ─── glossy 3D symbols (Wi-Fi, Bluetooth, lock...): extruded shapes and tubes, floating above their pedestal ───
       const ext = (shape, mat, depth = 0.14) => { const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.03, bevelSegments: 4, curveSegments: 32 }); g.center(); return mesh(g, mat); };
       const tube = (pts, r, mat) => mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(([x, y]) => V(x, y, 0)), false, 'catmullrom', 0), 64, r, 16), mat);
@@ -551,8 +762,9 @@
       const dress = (name, x, z, height, rot = 0) => {
         if (!OBJ[name]) return null;
         const m = OBJ[name](); neonize(m, PAL.accent[0]);
+        if (m.userData.yawed) m.children[0].rotation.y = 0;
         const mats = new Set(); m.traverse(o => { if (o.material) mats.add(o.material); });   // parts share materials: dim each one once
-        for (const mt of mats) { if (mt.uniforms && mt.uniforms.c) mt.uniforms.c.value.multiplyScalar(0.6); if (mt.isLineBasicMaterial) mt.opacity *= 0.55; }
+        for (const mt of mats) { if (mt.uniforms && mt.uniforms.c) mt.uniforms.c.value.multiplyScalar(0.6); if (mt.isLineBasicMaterial) mt.opacity *= 0.55; if (mt.isMeshBasicMaterial && mt.map) mt.opacity *= 0.5; }
         const box = new THREE.Box3().setFromObject(m), size = box.getSize(V());
         m.scale.setScalar(height / Math.max(size.y, 1e-6)); m.position.set(x, 0, z); m.rotation.y = rot; world.add(m); return m;
       };
@@ -561,15 +773,16 @@
         // a main avenue the camera travels down (the spots stand on it), blocks of buildings on both sides, cross streets,
         // parked cars and traffic lights at the corners: the Grouper city
         const towers = ['city_building', 'apartment_building', 'skyscraper', 'glass_skyscraper', 'office_building', 'tower_building', 'city_building_color'].filter(n => OBJ[n]);
-        const cars = ['sports_car', 'police_car', 'delivery_truck'].filter(n => OBJ[n]);
+        const TH = { city_building: 4.5, city_building_color: 5, apartment_building: 6, office_building: 6, tower_building: 12, skyscraper: 16, glass_skyscraper: 14 };   // real heights: a 5-storey block is not a tower
+        const cars = ['car', 'sports_car', 'police_car', 'pickup_truck', 'delivery_truck'].filter(n => OBJ[n]);
         const road = [];
         for (let z = 14; z > pathEnd; z -= 12) {
           for (const side of [-1, 1]) for (let col = 0; col < 3; col++) {
             const k = Math.round(z * 7 + side * 3 + col * 11);
-            if (towers.length) dress(towers[Math.floor(hash(k) * towers.length)], side * (8 + col * 6 + 1.5 * hash(k + 1)), z - 2 - 6 * hash(k + 2), 4 + 9 * hash(k + 3) + col * 3, hash(k + 4) * 6.28);
+            if (towers.length) { const t = towers[Math.floor(hash(k) * towers.length)]; dress(t, side * (8 + col * 6 + 1.5 * hash(k + 1)), z - 2 - 6 * hash(k + 2), (TH[t] || 8) * (0.8 + 0.4 * hash(k + 3)) + col * 2, hash(k + 4) * 6.28); }
           }
           road.push(-40, 0.01, z - 9, 40, 0.01, z - 9, -40, 0.01, z - 11, 40, 0.01, z - 11);                 // a cross street
-          if (cars.length) dress(cars[Math.floor(hash(z) * cars.length)], (hash(z + 5) > 0.5 ? 1 : -1) * 5.6, z - 5, 0.9, Math.PI / 2 * (hash(z + 6) > 0.5 ? 1 : -1));
+          if (cars.length) { const c = cars[Math.floor(hash(z) * cars.length)]; dress(c, (hash(z + 5) > 0.5 ? 1 : -1) * 5.6, z - 5, { car: 0.75, sports_car: 0.65, police_car: 0.8, pickup_truck: 1.0, delivery_truck: 1.6 }[c] || 0.9, Math.PI / 2 * (hash(z + 6) > 0.5 ? 1 : -1)); }
           if (OBJ.traffic_light) dress('traffic_light', 6.2, z - 8.4, 2.6, -Math.PI / 2);
         }
         for (const x of [-6.5, 6.5]) road.push(x, 0.01, 20, x, 0.01, pathEnd - 20);                          // the avenue's curbs
