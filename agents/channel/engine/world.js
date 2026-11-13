@@ -126,7 +126,7 @@
       // object, phones and boards and speakers included, stays the one-hue glass so the video keeps the palette (13.11)
       const COLOUR = new Set(['car', 'police_car', 'sports_car', 'pickup_truck', 'delivery_truck', 'semi_truck', 'motorcycle', 'helicopter',
         'chip', 'soda_can', 'globe', 'earth', 'planet', 'saturn', 'lock', 'padlock', 'cardboard_box', 'gas_tank', 'burger', 'pizza', 'pizza_slice',
-        'pizza_box', 'milk_carton', 'coin', 'gold_bars', 'money_bag', 'gift', 'key', 'pine_tree', 'trees', 'mountain', 'campfire', 'water_bottle', 'sofa_red']);
+        'pizza_box', 'controller', 'controller_ps', 'console_ps', 'console_xbox', 'pc_tower', 'milk_carton', 'coin', 'gold_bars', 'money_bag', 'gift', 'key', 'pine_tree', 'trees', 'mountain', 'campfire', 'water_bottle', 'sofa_red']);
       function neonize(root, c, keep = true) {
         // additive glow stacks up: a dense model with many overlapping parts (a NASA rover) burns out to white, so dim it
         let tris = 0; root.traverse(o => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
@@ -661,10 +661,9 @@
           return group(rbox(1.6, 1.2, 1.2, 0.02, card, [0, 0.6, 0]), rbox(1.62, 0.006, 0.01, 0.002, M.black, [0, 1.201, 0]),
             rbox(0.24, 0.008, 1.22, 0.003, tape, [0, 1.204, 0]), rbox(0.24, 0.5, 0.008, 0.003, tape, [0, 0.95, 0.604]), rbox(0.24, 0.5, 0.008, 0.003, tape, [0, 0.95, -0.604]));
         },
-        // Xbox Series style (153 x 104 x 61 mm, 1 unit = 100 mm): a rounded pebble body with grips curving down and in, the
-        // left stick high and the D-pad low on the left, the face buttons high and the right stick low on the right, the round
-        // guide button with its light ring at the top centre, view / share / menu buttons, bumpers, triggers and the USB-C port.
-        // No logos or letters.
+        // Xbox Series style (153 x 104 x 61 mm, 1 unit = 100 mm) in carbon black: a slim pebble body with grips curving down,
+        // the left stick high and the hybrid D-pad low on the left, the coloured face buttons high and the right stick low
+        // on the right, the lit guide button, view / share / menu, textured bumpers and triggers. No logos or letters.
         controller: () => {
           const s = new THREE.Shape();
           s.moveTo(0, 0.42);
@@ -677,33 +676,38 @@
           s.bezierCurveTo(-0.64, -0.64, -0.76, -0.52, -0.8, -0.3);
           s.bezierCurveTo(-0.84, -0.06, -0.82, 0.17, -0.72, 0.3);
           s.bezierCurveTo(-0.6, 0.45, -0.3, 0.45, 0, 0.42);
-          const shellGeo = new THREE.ExtrudeGeometry(s, { depth: 0.2, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.08, bevelSegments: 6, curveSegments: 28 });
-          shellGeo.translate(0, 0, -0.1);
-          const shell = M.black, key = M.white, Z = 0.2;
-          const g = group(mesh(shellGeo, shell));
-          const stick = (x, y) => g.add(cyl(0.11, 0.11, 0.02, M.darkMetal, [x, y, Z], [Math.PI / 2, 0, 0], 36), cyl(0.05, 0.06, 0.07, M.darkMetal, [x, y, Z + 0.04], [Math.PI / 2, 0, 0], 20),
-            cyl(0.085, 0.08, 0.03, key, [x, y, Z + 0.085], [Math.PI / 2, 0, 0], 36), mesh(new THREE.TorusGeometry(0.075, 0.012, 8, 36), key, [x, y, Z + 0.1]));
+          const geo = new THREE.ExtrudeGeometry(s, { depth: 0.08, bevelEnabled: true, bevelThickness: 0.055, bevelSize: 0.06, bevelSegments: 6, curveSegments: 28 });
+          geo.translate(0, 0, -0.04);
+          const body = real('#1d1e22', false, { rough: 0.55 }), grip = real('#121316', false, { rough: 0.9 }), dk = real('#0d0e10', false, { rough: 0.35, coat: 0.6 }), grey = real('#3a3c42', false, { rough: 0.4 }), Z = 0.095;
+          const g = group(mesh(geo, body));
+          // textured grips on the back of each handle
+          for (const sx of [-1, 1]) for (let k = 0; k < 9; k++) g.add(rbox(0.012, 0.22, 0.012, 0.004, grip, [sx * (0.56 + k * 0.022), -0.36 + k * 0.012, -0.075], [0, 0, sx * 0.3]));
+          const stick = (x, y) => g.add(cyl(0.1, 0.1, 0.012, dk, [x, y, Z], [Math.PI / 2, 0, 0], 40), cyl(0.04, 0.05, 0.05, grey, [x, y, Z + 0.03], [Math.PI / 2, 0, 0], 20),
+            cyl(0.078, 0.074, 0.022, grey, [x, y, Z + 0.062], [Math.PI / 2, 0, 0], 40), mesh(new THREE.TorusGeometry(0.07, 0.01, 8, 40), dk, [x, y, Z + 0.075]));
           stick(-0.45, 0.16); stick(0.2, -0.1);
-          // D-pad: a cross in a round well
-          g.add(mesh(new THREE.TorusGeometry(0.1, 0.012, 8, 40), M.darkMetal, [-0.2, -0.1, Z + 0.005]), rbox(0.17, 0.055, 0.03, 0.015, key, [-0.2, -0.1, Z + 0.02]), rbox(0.055, 0.17, 0.03, 0.015, key, [-0.2, -0.1, Z + 0.02]));
-          // the four face buttons in a diamond
-          for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) g.add(cyl(0.042, 0.042, 0.035, key, [0.46 + dx * 0.09, 0.16 + dy * 0.09, Z + 0.015], [Math.PI / 2, 0, 0], 28));
-          // guide button with its light ring, view and menu either side, share below
-          g.add(cyl(0.07, 0.07, 0.03, key, [0, 0.3, Z + 0.005], [Math.PI / 2, 0, 0], 36), mesh(new THREE.TorusGeometry(0.078, 0.01, 8, 40), glow(PAL.accent[1], 1.6), [0, 0.3, Z + 0.012]));
-          g.add(cyl(0.028, 0.028, 0.02, key, [-0.13, 0.15, Z + 0.005], [Math.PI / 2, 0, 0], 20), cyl(0.028, 0.028, 0.02, key, [0.13, 0.15, Z + 0.005], [Math.PI / 2, 0, 0], 20), rbox(0.06, 0.03, 0.02, 0.012, key, [0, 0.1, Z + 0.005]));
-          // bumpers along the top edge, the triggers behind them, the USB-C port and the pairing button between them
-          for (const sx of [-1, 1]) {
-            g.add(rbox(0.42, 0.06, 0.16, 0.025, M.darkMetal, [sx * 0.45, 0.4, 0.02], [0, 0, -sx * 0.22]));
-            g.add(rbox(0.2, 0.15, 0.12, 0.04, M.darkMetal, [sx * 0.48, 0.42, -0.14], [-0.4, 0, -sx * 0.2]));
+          // the hybrid D-pad: a faceted disc with the cross on it
+          g.add(cyl(0.095, 0.095, 0.014, dk, [-0.2, -0.1, Z + 0.004], [Math.PI / 2, 0, 0], 16), rbox(0.16, 0.05, 0.022, 0.012, grey, [-0.2, -0.1, Z + 0.014]), rbox(0.05, 0.16, 0.022, 0.012, grey, [-0.2, -0.1, Z + 0.014]));
+          // A green (bottom), B red (right), X blue (left), Y yellow (top): the colours the buttons are known by
+          for (const [dx, dy, c] of [[0, -1, '#3fb83f'], [1, 0, '#e2312d'], [-1, 0, '#2d6fd6'], [0, 1, '#f2c21b']]) {
+            g.add(cyl(0.042, 0.042, 0.028, real(c, false, { rough: 0.15, coat: 1 }), [0.46 + dx * 0.088, 0.16 + dy * 0.088, Z + 0.012], [Math.PI / 2, 0, 0], 28));
+            g.add(cyl(0.05, 0.05, 0.008, dk, [0.46 + dx * 0.088, 0.16 + dy * 0.088, Z], [Math.PI / 2, 0, 0], 28));
           }
-          g.add(rbox(0.06, 0.02, 0.025, 0.008, M.black, [0, 0.43, 0]), rbox(0.04, 0.02, 0.02, 0.008, key, [0.1, 0.43, -0.02]));
-          // the back: battery door and the grip texture lines
-          g.add(rbox(0.36, 0.24, 0.02, 0.04, M.darkMetal, [0, -0.06, -0.21]));
-          for (const sx of [-1, 1]) for (let k = 0; k < 6; k++) g.add(rbox(0.008, 0.18, 0.02, 0.003, M.darkMetal, [sx * (0.58 + k * 0.03), -0.36 + k * 0.01, -0.17], [0, 0, sx * 0.3]));
+          // guide button glowing white, view and menu either side, share below
+          g.add(cyl(0.068, 0.068, 0.02, dk, [0, 0.3, Z], [Math.PI / 2, 0, 0], 40), cyl(0.05, 0.05, 0.022, glow('#ffffff', 1.3), [0, 0.3, Z + 0.004], [Math.PI / 2, 0, 0], 40));
+          g.add(cyl(0.026, 0.026, 0.016, grey, [-0.13, 0.15, Z], [Math.PI / 2, 0, 0], 20), cyl(0.026, 0.026, 0.016, grey, [0.13, 0.15, Z], [Math.PI / 2, 0, 0], 20), rbox(0.055, 0.028, 0.016, 0.012, grey, [0, 0.1, Z]));
+          // bumpers along the top edge and the triggers behind them, the USB-C port and pairing button between them
+          for (const sx of [-1, 1]) {
+            g.add(rbox(0.42, 0.05, 0.12, 0.022, dk, [sx * 0.45, 0.405, 0.0], [0, 0, -sx * 0.22]));
+            g.add(rbox(0.18, 0.13, 0.1, 0.035, grey, [sx * 0.48, 0.42, -0.1], [-0.4, 0, -sx * 0.2]));
+            for (let k = 0; k < 5; k++) g.add(rbox(0.16, 0.006, 0.006, 0.002, dk, [sx * 0.48, 0.38 + k * 0.022, -0.05 - k * 0.012], [-0.4, 0, -sx * 0.2]));   // trigger grip lines
+          }
+          g.add(rbox(0.06, 0.02, 0.025, 0.008, dk, [0, 0.43, 0]), rbox(0.035, 0.018, 0.018, 0.007, grey, [0.1, 0.43, -0.02]));
+          g.add(rbox(0.36, 0.22, 0.012, 0.04, grip, [0, -0.06, -0.1]));   // battery door
           g.rotation.x = -0.95; g.position.y = 0.42; return group(g);
         },
-        // DualSense style (160 x 106 x 66 mm, 1 unit = 100 mm): one moulded outline with the two grips flaring down, the
-        // touchpad and light bar in the middle, two sticks side by side low, D-pad and four face buttons high. No logos.
+        // DualSense style (160 x 106 x 66 mm, 1 unit = 100 mm): a white two-tone shell, the black centre with both sticks
+        // side by side, the white touchpad with the blue light bar, the D-pad and four face buttons, the PS-style home and
+        // mic buttons. No logos and no button symbols.
         controller_ps: () => {
           const s = new THREE.Shape();
           s.moveTo(-0.32, 0.42); s.lineTo(0.32, 0.42);
@@ -715,21 +719,33 @@
           s.bezierCurveTo(-0.42, -0.62, -0.54, -0.72, -0.66, -0.64);
           s.bezierCurveTo(-0.82, -0.52, -0.84, -0.18, -0.8, 0.12);
           s.bezierCurveTo(-0.78, 0.36, -0.6, 0.44, -0.32, 0.42);
-          const geo = new THREE.ExtrudeGeometry(s, { depth: 0.18, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.07, bevelSegments: 5, curveSegments: 24 });
-          geo.translate(0, 0, -0.09);
-          const key = M.white, g = group(mesh(geo, M.black));
-          g.add(slab(0.56, 0.3, 0.05, 0.06, 0.012, M.darkMetal, [0, 0.2, 0.17]), slab(0.46, 0.04, 0.02, 0.02, 0.005, glow(PAL.accent[1], 1.6), [0, 0.04, 0.165]));
-          for (const x of [-0.24, 0.24]) g.add(cyl(0.085, 0.09, 0.06, M.darkMetal, [x, -0.14, 0.2], [Math.PI / 2, 0, 0], 32), cyl(0.075, 0.075, 0.03, key, [x, -0.14, 0.24], [Math.PI / 2, 0, 0], 32));
-          for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) g.add(rbox(0.07, 0.07, 0.03, 0.015, key, [-0.52 + dx * 0.075, 0.12 + dy * 0.075, 0.175]), cyl(0.04, 0.04, 0.03, key, [0.52 + dx * 0.085, 0.12 + dy * 0.085, 0.175], [Math.PI / 2, 0, 0], 24));
-          g.add(cyl(0.03, 0.03, 0.02, key, [0, -0.08, 0.17], [Math.PI / 2, 0, 0], 20), rbox(0.04, 0.06, 0.02, 0.01, key, [-0.36, 0.33, 0.15]), rbox(0.04, 0.06, 0.02, 0.01, key, [0.36, 0.33, 0.15]));
-          for (const sx of [-1, 1]) g.add(rbox(0.36, 0.06, 0.14, 0.025, M.darkMetal, [sx * 0.5, 0.42, 0.0], [0, 0, -sx * 0.15]), rbox(0.2, 0.14, 0.12, 0.04, M.darkMetal, [sx * 0.52, 0.42, -0.14], [-0.4, 0, -sx * 0.15]));
+          const geo = new THREE.ExtrudeGeometry(s, { depth: 0.08, bevelEnabled: true, bevelThickness: 0.055, bevelSize: 0.06, bevelSegments: 6, curveSegments: 28 });
+          geo.translate(0, 0, -0.04);
+          const white = real('#c9ccd2', false, { rough: 0.55, coat: 0.2 }), black = real('#17181c', false, { rough: 0.5 }), grey = real('#2c2e33', false, { rough: 0.3, coat: 0.6 }), Z = 0.095;
+          const g = group(mesh(geo, white));
+          // the black centre: a moulded panel under the touchpad holding the sticks
+          const c = new THREE.Shape(); c.moveTo(-0.42, 0.1); c.lineTo(0.42, 0.1); c.bezierCurveTo(0.44, -0.12, 0.3, -0.26, 0, -0.26); c.bezierCurveTo(-0.3, -0.26, -0.44, -0.12, -0.42, 0.1);
+          g.add(mesh(new THREE.ExtrudeGeometry(c, { depth: 0.01, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.012, bevelSegments: 2 }), black, [0, -0.02, Z - 0.004]));
+          g.add(slab(0.56, 0.3, 0.03, 0.06, 0.01, white, [0, 0.22, Z + 0.005]), rbox(0.5, 0.012, 0.01, 0.004, real('#e2e3e6'), [0, 0.07, Z + 0.006]));   // touchpad and its seam
+          g.add(slab(0.5, 0.025, 0.012, 0.012, 0.004, glow('#2f7dff', 1.8), [0, 0.055, Z + 0.004]));                                                      // light bar
+          for (const x of [-0.24, 0.24]) g.add(cyl(0.09, 0.09, 0.012, grey, [x, -0.14, Z + 0.01], [Math.PI / 2, 0, 0], 36), cyl(0.04, 0.05, 0.05, grey, [x, -0.14, Z + 0.035], [Math.PI / 2, 0, 0], 20),
+            cyl(0.075, 0.072, 0.022, black, [x, -0.14, Z + 0.065], [Math.PI / 2, 0, 0], 36), mesh(new THREE.TorusGeometry(0.066, 0.009, 8, 36), grey, [x, -0.14, Z + 0.077]));
+          for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+            g.add(rbox(0.068, 0.068, 0.022, 0.016, grey, [-0.52 + dx * 0.075, 0.12 + dy * 0.075, Z + 0.006], [0, 0, Math.PI / 4]));
+            g.add(cyl(0.04, 0.04, 0.026, grey, [0.52 + dx * 0.085, 0.12 + dy * 0.085, Z + 0.008], [Math.PI / 2, 0, 0], 28));
+          }
+          g.add(cyl(0.03, 0.03, 0.018, black, [0, -0.08, Z + 0.012], [Math.PI / 2, 0, 0], 24), rbox(0.08, 0.018, 0.012, 0.008, glow('#ff7a3d', 1.1), [0, -0.15, Z + 0.012]));   // home, mic
+          g.add(rbox(0.035, 0.06, 0.016, 0.01, black, [-0.36, 0.33, Z - 0.01]), rbox(0.035, 0.06, 0.016, 0.01, black, [0.36, 0.33, Z - 0.01]));                     // create, options
+          for (const sx of [-1, 1]) g.add(rbox(0.34, 0.05, 0.12, 0.022, black, [sx * 0.5, 0.42, 0.0], [0, 0, -sx * 0.15]), rbox(0.2, 0.13, 0.1, 0.035, black, [sx * 0.52, 0.42, -0.1], [-0.4, 0, -sx * 0.15]));
+          for (let k = 0; k < 16; k++) g.add(rbox(0.008, 0.008, 0.004, 0.002, grey, [-0.04 + (k % 4) * 0.027, -0.6 + 0.4 + Math.floor(k / 4) * 0.02, Z - 0.02]));   // speaker holes
           g.rotation.x = -0.95; g.position.y = 0.42; return group(g);
         },
-        // PS5 style console standing up (390 x 104 x 260 mm, 1 unit = 200 mm): a black core between two tall white wings
-        // that flare out at the top, light strips where they meet, the disc slot, buttons and ports on the front, the round
-        // stand. No logos.
+        // PS5 style console standing up (390 x 104 x 260 mm, 1 unit = 200 mm): a gloss black core between two tall matte
+        // white wings that flare out at the top, blue light strips where they meet, the disc slot, buttons and ports on the
+        // front, vents along the top and back, the round stand. No logos.
         console_ps: () => {
-          const g = group(rbox(0.32, 1.76, 1.06, 0.05, M.black, [0, 0.98, 0]));
+          const core = real('#0f1013', false, { rough: 0.12, coat: 1 }), wing = real('#f4f5f7', false, { rough: 0.5, coat: 0.3 }), dark = real('#25272c', false, { rough: 0.6 });
+          const blue = glow('#2f7dff', 1.8), g = group(rbox(0.32, 1.76, 1.06, 0.05, core, [0, 0.98, 0]));
           const w = new THREE.Shape();
           w.moveTo(-0.52, 0.08); w.lineTo(0.48, 0.08);
           w.bezierCurveTo(0.56, 0.7, 0.58, 1.4, 0.72, 1.98);
@@ -737,39 +753,38 @@
           w.bezierCurveTo(-0.6, 1.4, -0.56, 0.6, -0.52, 0.08);
           for (const sx of [-1, 1]) {
             const geo = new THREE.ExtrudeGeometry(w, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 3, curveSegments: 24 });
-            geo.rotateY(-Math.PI / 2); g.add(mesh(geo, M.white, [sx * 0.2 + (sx > 0 ? 0.05 : 0), 0, 0]));
-            g.add(rbox(0.012, 1.5, 0.012, 0.004, glow('#3b82ff', 1.6), [sx * 0.168, 1.0, 0.535]), rbox(0.012, 0.012, 0.9, 0.004, glow('#3b82ff', 1.4), [sx * 0.168, 1.865, 0.05]));
+            geo.rotateY(-Math.PI / 2); g.add(mesh(geo, wing, [sx * 0.2 + (sx > 0 ? 0.05 : 0), 0, 0]));
+            g.add(rbox(0.014, 1.55, 0.014, 0.005, blue, [sx * 0.168, 1.0, 0.535]), rbox(0.014, 0.014, 1.0, 0.005, blue, [sx * 0.168, 1.865, 0.03]));
+            // the fine dot pattern on the inside of each wing, seen through the gap
+            for (let k = 0; k < 18; k++) g.add(rbox(0.006, 0.012, 0.012, 0.003, dark, [sx * 0.19, 0.3 + (k % 6) * 0.25, -0.3 + Math.floor(k / 6) * 0.3]));
           }
-          // front: the disc slot, eject and power buttons, USB-A and USB-C; top and back vents; the stand
-          g.add(rbox(0.012, 0.03, 0.62, 0.008, M.darkMetal, [0.14, 0.42, 0.53], [0, Math.PI / 2, 0]), rbox(0.24, 0.006, 0.006, 0.002, M.chrome, [0, 0.42, 0.534]));
-          g.add(rbox(0.05, 0.02, 0.01, 0.004, M.chrome, [-0.05, 0.62, 0.534]), rbox(0.05, 0.02, 0.01, 0.004, M.chrome, [0.05, 0.62, 0.534]));
-          g.add(rbox(0.07, 0.035, 0.012, 0.004, M.darkMetal, [-0.06, 0.78, 0.534]), rbox(0.04, 0.018, 0.012, 0.006, M.darkMetal, [0.07, 0.78, 0.534]));
-          for (let k = 0; k < 14; k++) g.add(rbox(0.26, 0.008, 0.04, 0.003, M.darkMetal, [0, 1.865, -0.45 + k * 0.065]));
-          for (let k = 0; k < 10; k++) g.add(rbox(0.24, 0.03, 0.008, 0.003, M.darkMetal, [0, 1.2 + k * 0.06, -0.534]));
-          g.add(cyl(0.3, 0.32, 0.05, M.black, [0, 0.025, 0], [0, 0, 0], 48), cyl(0.06, 0.06, 0.08, M.darkMetal, [0, 0.08, 0], [0, 0, 0], 20));
-          // inside the core: the main board, the cooling fan, the big heat sink and the power supply
-          g.add(rbox(0.012, 1.2, 0.8, 0.01, M.pcb, [-0.06, 1.0, 0]), rbox(0.03, 0.14, 0.14, 0.01, M.chrome, [-0.04, 1.1, 0.05]));
-          g.add(cyl(0.22, 0.22, 0.08, M.darkMetal, [0.06, 1.5, -0.25], [0, 0, Math.PI / 2], 36));
-          for (let k = 0; k < 12; k++) g.add(rbox(0.1, 0.5, 0.008, 0.002, M.darkMetal, [0.08, 1.0, -0.2 + k * 0.035]));
-          g.add(rbox(0.12, 0.3, 0.4, 0.02, M.darkMetal, [0.06, 0.45, -0.25]));
+          // front: the disc slot with its chrome lip, eject and power buttons, USB-A and USB-C
+          g.add(rbox(0.26, 0.03, 0.012, 0.008, dark, [0, 0.42, 0.535]), rbox(0.24, 0.006, 0.006, 0.002, M.chrome, [0, 0.405, 0.542]));
+          g.add(rbox(0.06, 0.02, 0.012, 0.006, M.chrome, [-0.06, 0.62, 0.536]), rbox(0.06, 0.02, 0.012, 0.006, M.chrome, [0.06, 0.62, 0.536]));
+          g.add(rbox(0.08, 0.035, 0.014, 0.004, dark, [-0.06, 0.78, 0.536]), rbox(0.045, 0.02, 0.014, 0.008, dark, [0.07, 0.78, 0.536]));
+          for (let k = 0; k < 14; k++) g.add(rbox(0.26, 0.01, 0.04, 0.003, dark, [0, 1.866, -0.45 + k * 0.065]));            // top vent
+          for (let k = 0; k < 12; k++) g.add(rbox(0.24, 0.035, 0.012, 0.003, dark, [0, 1.1 + k * 0.06, -0.535]));            // back vent
+          for (let k = 0; k < 4; k++) g.add(rbox(0.06, 0.03, 0.014, 0.004, dark, [-0.08 + (k % 2) * 0.16, 0.4 + Math.floor(k / 2) * 0.08, -0.536]));   // HDMI, LAN, USB, power
+          g.add(cyl(0.3, 0.32, 0.05, core, [0, 0.025, 0], [0, 0, 0], 48), cyl(0.06, 0.06, 0.08, dark, [0, 0.08, 0], [0, 0, 0], 20));
           g.rotation.y = 1.05;   // the wing side towards the camera, the front still in view
           return group(g);
         },
-        // Xbox Series X style (151 x 301 x 151 mm, 1 unit = 200 mm): a black monolith, the dished top vent full of holes with
-        // a glow under it, power button, disc slot, USB port and pairing button on the front, ports on the back. No logos.
+        // Xbox Series X style (151 x 301 x 151 mm, 1 unit = 200 mm): a matte black monolith on a small foot, the dished top
+        // vent full of holes glowing green from inside, the lit power button, disc slot, USB port and pairing button on the
+        // front, the big rear vent and ports. No logos.
         console_xbox: () => {
-          const S = 0.755, H = 1.505, g = group(rbox(S, H - 0.04, S, 0.03, M.black, [0, 0.02 + (H - 0.04) / 2, 0]), rbox(S - 0.12, 0.04, S - 0.12, 0.02, M.darkMetal, [0, 0.02, 0]));
-          g.add(cyl(0.33, 0.3, 0.04, M.darkMetal, [0, H - 0.03, 0], [0, 0, 0], 56), cyl(0.29, 0.29, 0.01, glow('#3cd070', 1.2), [0, H - 0.05, 0], [0, 0, 0], 56));
-          for (let r = 0.05; r < 0.3; r += 0.045) { const n = Math.max(6, Math.round(r * 40)); for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2 + r * 7; g.add(cyl(0.012, 0.012, 0.03, M.black, [Math.cos(a) * r, H - 0.01, Math.sin(a) * r], [0, 0, 0], 8)); } }
-          g.add(cyl(0.035, 0.035, 0.012, M.white, [-0.26, H - 0.14, S / 2 + 0.002], [Math.PI / 2, 0, 0], 24));                          // power
-          g.add(rbox(0.012, 0.6, 0.01, 0.004, M.darkMetal, [-0.26, H - 0.62, S / 2 + 0.002]), rbox(0.04, 0.03, 0.012, 0.006, M.white, [-0.26, H - 1.0, S / 2 + 0.002]));   // disc slot, eject
-          g.add(rbox(0.07, 0.035, 0.012, 0.004, M.darkMetal, [0.24, 0.22, S / 2 + 0.002]), cyl(0.018, 0.018, 0.012, M.white, [0.3, 0.32, S / 2 + 0.002], [Math.PI / 2, 0, 0], 16));
-          for (let k = 0; k < 5; k++) g.add(rbox(0.07, 0.03, 0.012, 0.004, M.darkMetal, [-0.18 + k * 0.09, 0.3, -S / 2 - 0.002]));
-          g.add(cyl(0.22, 0.22, 0.012, M.darkMetal, [0, H - 0.4, -S / 2 - 0.002], [Math.PI / 2, 0, 0], 40));                           // rear vent
-          // inside: the split motherboard, the vapour chamber heat sink, the big top fan and the power supply
-          g.add(rbox(0.6, 0.9, 0.012, 0.01, M.pcb, [0, 0.8, -0.1]), rbox(0.6, 0.6, 0.012, 0.01, M.pcb, [0, 0.55, 0.15]), rbox(0.5, 0.25, 0.3, 0.02, M.darkMetal, [0, 1.05, 0.05]));
-          for (let k = 0; k < 10; k++) g.add(rbox(0.5, 0.2, 0.006, 0.002, M.chrome, [0, 1.05, -0.08 + k * 0.03]));
-          g.add(cyl(0.3, 0.3, 0.06, M.darkMetal, [0, H - 0.12, 0], [0, 0, 0], 48), rbox(0.55, 0.22, 0.55, 0.02, M.darkMetal, [0, 0.16, 0]));
+          const S = 0.755, H = 1.505, body = real('#26282c', false, { rough: 0.8 }), dish = real('#0d0e10', false, { rough: 0.6 }), dark = real('#2b2d32', false, { rough: 0.5 });
+          const g = group(rbox(S, H - 0.06, S, 0.035, body, [0, 0.06 + (H - 0.06) / 2, 0]), rbox(S - 0.16, 0.06, S - 0.16, 0.02, dish, [0, 0.03, 0]));
+          g.add(rbox(S + 0.004, 0.006, S + 0.004, 0.003, dark, [0, H - 0.12, 0]));   // the seam under the top
+          g.add(mesh(new THREE.TorusGeometry(0.32, 0.025, 10, 64), dish, [0, H - 0.005, 0], [Math.PI / 2, 0, 0]), cyl(0.31, 0.31, 0.008, dish, [0, H + 0.004, 0], [0, 0, 0], 64));
+          const xg = glow('#3cd070', 1.8); for (let r = 0.035; r < 0.3; r += 0.026) { const n = Math.max(6, Math.round(r * 62)); for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2 + r * 7; g.add(cyl(0.012, 0.012, 0.004, xg, [Math.cos(a) * r, H + 0.008, Math.sin(a) * r], [0, 0, 0], 6)); } }
+          g.add(cyl(0.034, 0.034, 0.012, dark, [-0.27, H - 0.16, S / 2 + 0.003], [Math.PI / 2, 0, 0], 28), cyl(0.024, 0.024, 0.014, glow('#ffffff', 1.4), [-0.27, H - 0.16, S / 2 + 0.004], [Math.PI / 2, 0, 0], 28));   // power
+          g.add(rbox(0.014, 0.62, 0.012, 0.005, dish, [-0.27, H - 0.66, S / 2 + 0.003]), rbox(0.04, 0.025, 0.012, 0.006, dark, [-0.27, H - 1.04, S / 2 + 0.003]));   // disc slot, eject
+          g.add(rbox(0.07, 0.035, 0.014, 0.004, dish, [0.24, 0.24, S / 2 + 0.003]), cyl(0.018, 0.018, 0.012, dark, [0.3, 0.34, S / 2 + 0.003], [Math.PI / 2, 0, 0], 16));
+          for (let k = 0; k < 6; k++) g.add(rbox(0.07, 0.032, 0.014, 0.004, dish, [-0.22 + k * 0.088, 0.3, -S / 2 - 0.003]));   // ports
+          g.add(cyl(0.24, 0.24, 0.014, dish, [0, H - 0.45, -S / 2 - 0.003], [Math.PI / 2, 0, 0], 48));
+          for (let k = 0; k < 7; k++) g.add(rbox(0.4, 0.012, 0.016, 0.004, body, [0, H - 0.63 + k * 0.06, -S / 2 - 0.006]));   // rear vent bars
+          g.rotation.x = 0.18; g.position.z = -0.12; g.position.y = 0.07;   // tipped towards the camera so the green top shows
           return group(g);
         },
         // a gaming PC (450 x 470 x 220 mm mid tower, 1 unit = 240 mm), the glass side facing you: frame, motherboard with
@@ -793,7 +808,10 @@
           for (const y of [0.62, 1.06, 1.5]) fan([-x0 - 0.06, y, 0], 'x');
           fan([x0 + 0.06, 1.5, -0.05], 'x');
           // the motherboard and what sits on it
-          g.add(rbox(1.1, 1.3, 0.02, 0.01, M.pcb, [-0.3, 1.18, -D / 2 + 0.06]));
+          g.add(rbox(1.1, 1.3, 0.02, 0.01, real('#1d2026', false, { rough: 0.5 }), [-0.3, 1.18, -D / 2 + 0.06]));
+          g.add(rbox(0.4, 0.1, 0.08, 0.02, M.alu, [-0.35, 1.72, -D / 2 + 0.1]), rbox(0.1, 0.35, 0.08, 0.02, M.alu, [-0.62, 1.45, -D / 2 + 0.1]), rbox(0.22, 0.22, 0.04, 0.02, M.alu, [-0.1, 0.65, -D / 2 + 0.09]));   // VRM and chipset heat sinks
+          g.add(rbox(0.04, 0.22, 0.05, 0.01, M.black, [0.21, 1.3, -D / 2 + 0.09]));   // 24-pin power plug
+          for (const x of [-0.35, 0.15]) fan([x, H - 0.06, -0.05], 'y', 0.2);   // two exhaust fans in the roof
           g.add(rbox(0.16, 0.16, 0.03, 0.01, M.chrome, [-0.35, 1.45, -D / 2 + 0.09]));
           const fins = group(); for (let k = 0; k < 16; k++) fins.add(rbox(0.32, 0.5, 0.006, 0.002, M.chrome, [0, 0, -0.15 + k * 0.02])); fins.position.set(-0.35, 1.45, -0.1); g.add(fins);
           for (let k = 0; k < 4; k++) g.add(mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(-0.42 + k * 0.05, 1.4, -D / 2 + 0.1), V(-0.42 + k * 0.05, 1.5, -0.3), V(-0.42 + k * 0.05, 1.68, -0.15)]), 12, 0.012, 6), M.gold));
