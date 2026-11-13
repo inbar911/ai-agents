@@ -92,6 +92,21 @@
         vertexShader: 'varying vec3 n; varying vec3 v; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); n = normalize(normalMatrix * normal); v = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
         fragmentShader: 'uniform vec3 c; varying vec3 n; varying vec3 v; void main(){ float r = pow(1.0 - abs(dot(normalize(n), normalize(v))), 2.2); gl_FragColor = vec4(c * (0.11 + 1.25 * r), 1.0); }',
       });
+      // real colours inside the Grouper look (13.11, pilot): a part made with real(hex) keeps its colour, lit by a soft key
+      // light with the palette's rim on its edges; real(hex, true) is a see-through shell (a truck's body, a phone's back
+      // glass) so what's inside shows. Everything else stays the one-hue glass.
+      const VSN = 'varying vec3 n; varying vec3 v; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); n = normalize(normalMatrix * normal); v = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }';
+      const REAL = (c, shell) => new THREE.ShaderMaterial({
+        uniforms: { c: { value: new THREE.Color(c) }, rim: { value: new THREE.Color(PAL.accent[1]) } },
+        transparent: shell, depthWrite: !shell, side: shell ? THREE.DoubleSide : THREE.FrontSide, vertexShader: VSN,
+        fragmentShader: shell
+          ? 'uniform vec3 c; uniform vec3 rim; varying vec3 n; varying vec3 v; void main(){ float r = pow(1.0 - abs(dot(normalize(n), normalize(v))), 2.4); gl_FragColor = vec4(mix(c * 0.45, mix(c, rim, 0.3), r), 0.1 + 0.5 * r); }'
+          : 'uniform vec3 c; uniform vec3 rim; varying vec3 n; varying vec3 v; void main(){ vec3 N = normalize(n); float d = abs(dot(N, normalize(v))); float key = max(dot(N, normalize(vec3(0.35, 0.85, 0.4))), 0.0); float r = pow(1.0 - d, 3.0); gl_FragColor = vec4(c * (0.3 + 0.55 * key + 0.2 * d) + rim * 0.3 * r, 1.0); }',
+      });
+      const real = (hex, shell = false) => { const m = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.45, metalness: 0.2, transparent: shell, opacity: shell ? 0.25 : 1 }); m.userData.real = hex; m.userData.shell = shell; return m; };
+      // printed text, silkscreen and labels: drawn on a transparent canvas and laid on a part as a decal (normal blending,
+      // so dark ink on a silver lid stays dark)
+      const ink = (w, h, paint) => { const m = new THREE.MeshBasicMaterial({ map: tex(w, h, paint), transparent: true, depthWrite: false }); m.userData.decal = true; return m; };
       function neonize(root, c) {
         // additive glow stacks up: a dense model with many overlapping parts (a NASA rover) burns out to white, so dim it
         let tris = 0; root.traverse(o => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
@@ -103,6 +118,13 @@
         const meshes = []; root.traverse(o => { if (o.isMesh) meshes.push(o); });
         for (const m of meshes) {
           m.castShadow = m.receiveShadow = false;
+          if (m.material.userData.decal) continue;
+          if (m.material.userData.real) {
+            const sh = m.material.userData.shell; m.material = REAL(m.material.userData.real, sh);
+            if (!sh) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 30), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18, depthWrite: false })));
+            else m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 25), edge));
+            continue;
+          }
           if (m.material.emissiveMap) { m.material = new THREE.MeshBasicMaterial(Object.assign({ map: m.material.emissiveMap, color: new THREE.Color(m.material.userData.tint || 0xffffff), opacity: m.material.userData.tint ? 0.85 : 0.45 }, ADD)); continue; }   // screens keep their picture
           if (m.material.emissive && m.material.emissive.getHex() !== 0 && m.material.emissiveIntensity >= 1) { m.material = new THREE.MeshBasicMaterial(Object.assign({ color: m.material.emissive }, ADD)); continue; }   // LEDs
           const light = m.material === M.white || m.material === M.chrome;   // white/chrome details (a rune, a shackle) read as the bright part
@@ -116,16 +138,19 @@
       // ─── screens drawn on canvases (a phone home screen, a laptop window, a watch face, a TV picture) ───
       const roundRect = (x, X, Y, w, h, r) => { x.beginPath(); x.roundRect(X, Y, w, h, r); x.fill(); };
       // screens in the Grouper look stay inside the one palette (lavender UI), the old palettes keep app colours
-      const APP = PAL.glass ? ['#c9c5ff', '#9d97ff', '#b7b1ff', '#8e88f5', '#d8d5ff', '#a9a3ff'] : ['#34c759', '#0a84ff', '#ff9f0a', '#ff375f', '#5e5ce6', '#64d2ff', '#ffd60a', '#bf5af2', '#ff453a', '#30d158', '#0a84ff', '#ff9f0a'];
-      const phoneScreenOf = (hole) => tex(512, 1060, (x, w, h) => {
-        const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, PAL.accent[0]); g.addColorStop(1, PAL.accent[1]); x.fillStyle = g; x.fillRect(0, 0, w, h);
+      const APPS = PAL.glass ? ['#c9c5ff', '#9d97ff', '#b7b1ff', '#8e88f5', '#d8d5ff', '#a9a3ff'] : ['#34c759', '#0a84ff', '#ff9f0a', '#ff375f', '#5e5ce6', '#64d2ff', '#ffd60a', '#bf5af2', '#ff453a', '#30d158', '#0a84ff', '#ff9f0a'];
+      const VIVID = ['#34c759', '#0a84ff', '#ff9f0a', '#ff375f', '#5e5ce6', '#64d2ff', '#ffd60a', '#bf5af2', '#ff453a', '#30d158', '#0a84ff', '#ff9f0a'];
+      // vivid: the real-colour models' screen (real app colours on a deep wallpaper); otherwise the palette's UI
+      const phoneScreenOf = (hole, vivid = false) => tex(512, 1060, (x, w, h) => {
+        const APP = vivid ? VIVID : APPS;
+        const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, vivid ? '#1d3b8f' : PAL.accent[0]); g.addColorStop(1, vivid ? '#6d28d9' : PAL.accent[1]); x.fillStyle = g; x.fillRect(0, 0, w, h);
         x.fillStyle = 'rgba(255,255,255,0.95)'; x.font = '600 44px Rubik'; x.textAlign = 'center'; x.fillText('9:41', 110, 72);
         x.fillStyle = '#000'; if (hole) { x.beginPath(); x.arc(w / 2, 46, 20, 0, 7); x.fill(); } else roundRect(x, w / 2 - 54, 26, 108, 38, 19);   // punch hole or (25% smaller) island
         for (let k = 0; k < 16; k++) { x.fillStyle = APP[k % APP.length]; roundRect(x, 46 + (k % 4) * 112, 170 + Math.floor(k / 4) * 132, 84, 84, 22); }
         x.fillStyle = 'rgba(255,255,255,0.3)'; roundRect(x, 28, h - 170, w - 56, 130, 44);   // dock
         for (let k = 0; k < 4; k++) { x.fillStyle = APP[(k * 3 + 1) % APP.length]; roundRect(x, 56 + k * 112, h - 147, 84, 84, 22); }
       });
-      const phoneScreen = phoneScreenOf(false), phoneScreenUltra = phoneScreenOf(true);
+      const phoneScreen = phoneScreenOf(false), phoneScreenUltra = phoneScreenOf(true), phoneScreenReal = phoneScreenOf(false, true);
       const laptopScreen = tex(1024, 640, (x, w, h) => {
         x.fillStyle = '#f2f4f8'; x.fillRect(0, 0, w, h);
         x.fillStyle = '#d9dde5'; x.fillRect(0, 0, w, 54); ['#ff5f57', '#febc2e', '#28c840'].forEach((c, k) => { x.fillStyle = c; x.beginPath(); x.arc(30 + k * 32, 27, 10, 0, 7); x.fill(); });
@@ -192,10 +217,11 @@
       };
       const sideFlat = (cmds, z, mat) => { const m = mesh(new THREE.ShapeGeometry(prof(cmds), 12), mat, [0, 0, z]); if (z < 0) m.scale.z = -1; return m; };   // a side window
       const seam = (x, y, h, z) => rbox(0.004, h, 0.004, 0.001, M.black, [x, y, z]);                                                   // a door gap
-      const wheel = (R, w, at, spokes = 5) => {
-        const g = group(cyl(R, R, w, M.black, [0, 0, 0], [Math.PI / 2, 0, 0], 40), cyl(R * 0.68, R * 0.68, w + 0.004, M.darkMetal, [0, 0, 0], [Math.PI / 2, 0, 0], 32),
-          cyl(R * 0.16, R * 0.16, w + 0.012, M.chrome, [0, 0, 0], [Math.PI / 2, 0, 0], 16));
-        for (let k = 0; k < spokes; k++) { const a = k * Math.PI * 2 / spokes; g.add(rbox(R * 0.13, R * 0.5, 0.01, 0.004, M.alu, [Math.sin(a) * R * 0.38, Math.cos(a) * R * 0.38, w / 2 + 0.004], [0, 0, -a])); }
+      // mats: [tyre, rim, hub, spoke]; the real-colour models pass real() ones
+      const wheel = (R, w, at, spokes = 5, mats = [M.black, M.darkMetal, M.chrome, M.alu]) => {
+        const g = group(cyl(R, R, w, mats[0], [0, 0, 0], [Math.PI / 2, 0, 0], 40), cyl(R * 0.68, R * 0.68, w + 0.004, mats[1], [0, 0, 0], [Math.PI / 2, 0, 0], 32),
+          cyl(R * 0.16, R * 0.16, w + 0.012, mats[2], [0, 0, 0], [Math.PI / 2, 0, 0], 16));
+        for (let k = 0; k < spokes; k++) { const a = k * Math.PI * 2 / spokes; g.add(rbox(R * 0.13, R * 0.5, 0.01, 0.004, mats[3], [Math.sin(a) * R * 0.38, Math.cos(a) * R * 0.38, w / 2 + 0.004], [0, 0, -a])); }
         g.position.set(...at); if (at[2] < 0) g.scale.z = -1; return g;
       };
       // vehicles stand three-quarter on, nose to the camera, a little smaller than their 2 m length so they fit the 9:16 frame;
@@ -256,20 +282,42 @@
       // ─── the object library. Each builder returns a group sitting on y = 0, about 1-2 units tall ───
       const OBJ = {
         // Phones built from the real devices' measurements (1 unit = 100 mm), no logos (trademarks).
-        // phone: iPhone 18 Pro Max style (163.4 x 78.0 x 8.75 mm, full-width camera plateau, 3 big lenses, Dynamic Island)
+        // phone: iPhone 18 Pro Max style (163.4 x 78.0 x 8.75 mm, full-width camera plateau, 3 big lenses, Dynamic Island).
+        // Real colours and see-through (13.11 pilot): a natural-titanium frame and clear glass, and inside them the L-shaped
+        // battery, the stacked logic board with SoC, RAM and modem, the camera modules, the copper charging coil and its
+        // magnet ring, the haptic motor, speaker, USB-C port and the flex cables between them. No logos.
         phone: () => {
           const W = 0.78, H = 1.634, D = 0.0875, R = 0.115;
-          const g = group(slab(W, H, D, R, 0.012, M.titanium), slab(W - 0.01, H - 0.01, 0.012, R - 0.005, 0.004, M.glass, [0, 0, D / 2 - 0.004]),
-            mesh(new THREE.ShapeGeometry(rrShape(W - 0.05, H - 0.05, R - 0.025), 16), screenMat(phoneScreen), [0, 0, D / 2 + 0.0035]));
-          fitUV(g.children[2].geometry, W - 0.05, H - 0.05);
+          const ti = real('#8e9097', true), tiSolid = real('#9a9ca3'), glassS = real('#1b1f27', true), lens = real('#0b0d11'), black = real('#16181d'),
+            board = real('#16324f'), chip = real('#a8adb5'), copper = real('#c47a3a'), flex = real('#c98a2c'), steel = real('#8d939c');
+          const g = group(slab(W, H, D, R, 0.012, ti), slab(W - 0.01, H - 0.01, 0.012, R - 0.005, 0.004, glassS, [0, 0, D / 2 - 0.004]),
+            mesh(new THREE.ShapeGeometry(rrShape(W - 0.05, H - 0.05, R - 0.025), 16), Object.assign(new THREE.MeshBasicMaterial({ map: phoneScreenReal }), { userData: { decal: true } }), [0, 0, D / 2 + 0.0035]));
+          fitUV(g.children[2].geometry, W - 0.05, H - 0.05);   // the screen is lit and opaque: the parts show through the back glass
+          // inside: battery (an L around the board) with its printed label
+          g.add(rbox(0.6, 0.86, 0.034, 0.02, black, [0.02, -0.28, -0.006]), rbox(0.3, 0.3, 0.034, 0.02, black, [-0.13, 0.33, -0.006]));
+          g.add(plane(0.5, 0.3, ink(400, 240, (x) => { x.fillStyle = 'rgba(235,235,235,0.9)'; x.font = '700 34px Rubik'; x.fillText('Li-ion Polymer', 20, 60); x.font = '400 26px Rubik'; x.fillText('4685 mAh · 3.86 V · 18.1 Wh', 20, 110); x.fillText('Do not puncture or heat', 20, 160); }), [0.02, -0.28, 0.0115]));
+          // the logic board, stacked, with the SoC, RAM, modem, storage and small parts
+          g.add(rbox(0.26, 0.62, 0.012, 0.01, board, [0.22, 0.38, 0.0]), rbox(0.26, 0.62, 0.012, 0.01, board, [0.22, 0.38, -0.02]));
+          g.add(rbox(0.13, 0.13, 0.008, 0.01, chip, [0.22, 0.52, 0.009]), rbox(0.1, 0.06, 0.008, 0.005, black, [0.22, 0.4, 0.009]), rbox(0.08, 0.08, 0.008, 0.005, chip, [0.2, 0.28, 0.009]),
+            rbox(0.09, 0.07, 0.008, 0.005, black, [0.24, 0.16, 0.009]));
+          g.add(plane(0.12, 0.12, ink(128, 128, (x) => { x.fillStyle = '#2a2f38'; x.textAlign = 'center'; x.font = '800 30px Rubik'; x.fillText('N9 PRO', 64, 60); x.font = '500 18px Rubik'; x.fillText('2nm · 2611', 64, 90); }), [0.22, 0.52, 0.0135]));
+          for (let k = 0; k < 18; k++) g.add(rbox(0.018, 0.012, 0.006, 0.002, k % 3 ? black : chip, [0.12 + hash(k) * 0.2, 0.1 + hash(k + 40) * 0.56, 0.008]));
+          // cameras behind the plateau, Face ID / front camera at the top, flex cables
+          [[-0.255, H / 2 - 0.165], [-0.085, H / 2 - 0.25], [-0.255, H / 2 - 0.335]].forEach(([x, y]) => g.add(rbox(0.13, 0.13, 0.05, 0.01, black, [x, y, -0.01]), cyl(0.045, 0.045, 0.01, steel, [x, y, 0.017], [Math.PI / 2, 0, 0], 24)));
+          g.add(rbox(0.26, 0.05, 0.02, 0.008, black, [0, H / 2 - 0.08, 0.02]));
+          g.add(rbox(0.04, 0.3, 0.003, 0.001, flex, [0.05, 0.6, 0.012]), rbox(0.22, 0.03, 0.003, 0.001, flex, [0.0, -0.73, 0.012]), rbox(0.03, 0.5, 0.003, 0.001, flex, [-0.34, -0.2, 0.012]));
+          // MagSafe-style coil and magnet ring on the back, the haptic motor, speaker and USB-C port at the bottom
+          g.add(mesh(new THREE.TorusGeometry(0.17, 0.02, 8, 48), copper, [0, -0.25, -0.032]), mesh(new THREE.TorusGeometry(0.11, 0.018, 8, 48), copper, [0, -0.25, -0.032]));
+          for (let k = 0; k < 18; k++) { const a = k / 18 * Math.PI * 2; g.add(rbox(0.035, 0.02, 0.008, 0.002, steel, [Math.cos(a) * 0.23, -0.25 + Math.sin(a) * 0.23, -0.034], [0, 0, a + Math.PI / 2])); }
+          g.add(rbox(0.22, 0.07, 0.03, 0.01, steel, [-0.2, -0.74, 0]), rbox(0.16, 0.06, 0.03, 0.01, black, [0.22, -0.74, 0]), rbox(0.1, 0.012, 0.04, 0.005, tiSolid, [0, -H / 2 + 0.004, 0]));
           // the camera plateau: across the whole back, the top 30%, raised 2.8 mm
-          g.add(slab(W - 0.04, 0.46, 0.028, 0.08, 0.006, M.titanium, [0, H / 2 - 0.25, -D / 2 - 0.012]));
-          g.add(slab(0.36, 0.36, 0.012, 0.075, 0.004, M.glass, [-0.17, H / 2 - 0.25, -D / 2 - 0.028]));
+          g.add(slab(W - 0.04, 0.46, 0.028, 0.08, 0.006, ti, [0, H / 2 - 0.25, -D / 2 - 0.012]));
+          g.add(slab(0.36, 0.36, 0.012, 0.075, 0.004, glassS, [-0.17, H / 2 - 0.25, -D / 2 - 0.028]));
           [[-0.255, H / 2 - 0.165], [-0.085, H / 2 - 0.25], [-0.255, H / 2 - 0.335]].forEach(([x, y]) => g.add(
-            cyl(0.0825, 0.0825, 0.022, M.titanium, [x, y, -D / 2 - 0.04], [Math.PI / 2, 0, 0], 48), cyl(0.062, 0.062, 0.024, M.lens, [x, y, -D / 2 - 0.042], [Math.PI / 2, 0, 0], 48)));
-          g.add(cyl(0.028, 0.028, 0.01, M.white, [0.2, H / 2 - 0.19, -D / 2 - 0.03], [Math.PI / 2, 0, 0]), cyl(0.026, 0.026, 0.01, M.lens, [0.2, H / 2 - 0.31, -D / 2 - 0.03], [Math.PI / 2, 0, 0]));   // flash, LiDAR
-          [[0.13, 0.17], [0.42, 0.1]].forEach(([y, h]) => g.add(rbox(0.01, h, 0.03, 0.005, M.titanium, [W / 2 + 0.003, H / 2 - y - h / 2, 0])));   // buttons
-          g.add(rbox(0.012, 0.11, 0.025, 0.005, M.glass, [W / 2 + 0.002, -0.2, 0]));   // camera control
+            cyl(0.0825, 0.0825, 0.022, tiSolid, [x, y, -D / 2 - 0.04], [Math.PI / 2, 0, 0], 48), cyl(0.062, 0.062, 0.024, lens, [x, y, -D / 2 - 0.042], [Math.PI / 2, 0, 0], 48)));
+          g.add(cyl(0.028, 0.028, 0.01, real('#f3e9cf'), [0.2, H / 2 - 0.19, -D / 2 - 0.03], [Math.PI / 2, 0, 0]), cyl(0.026, 0.026, 0.01, lens, [0.2, H / 2 - 0.31, -D / 2 - 0.03], [Math.PI / 2, 0, 0]));   // flash, LiDAR
+          [[0.13, 0.17], [0.42, 0.1]].forEach(([y, h]) => g.add(rbox(0.01, h, 0.03, 0.005, tiSolid, [W / 2 + 0.003, H / 2 - y - h / 2, 0])));   // buttons
+          g.add(rbox(0.012, 0.11, 0.025, 0.005, lens, [W / 2 + 0.002, -0.2, 0]));   // camera control
           g.rotation.x = -0.12; g.position.y = 0.84; return group(g);
         },
         // phone_ultra: Galaxy S26 Ultra style (163.6 x 78.1 x 7.9 mm, flat frame, rounder corners than the S25, raised camera island, S Pen)
@@ -341,14 +389,54 @@
         },
         // a processor on its motherboard: the board's traces, the socket, the silver heat spreader with its chamfered
         // corner, capacitors and the power stages around it (boardTex keeps its light in the glass look).
+        // a desktop processor on its motherboard, in real colours (13.11 pilot): green board with gold traces and white
+        // silkscreen, the black socket and its steel retention frame, the silver heat spreader laser-etched with a made-up
+        // brand (no real trademark), VRM chokes under a finned heatsink, solid capacitors, two DIMMs in their slots, an M.2
+        // SSD and the chipset heatsink.
         chip: () => {
-          const g = group(slab(1.8, 1.8, 0.04, 0.03, 0.006, new THREE.MeshStandardMaterial({ color: 0x14301f, emissive: 0xffffff, emissiveMap: boardTex, emissiveIntensity: 0.4 }), [0, 0.02, 0], [-Math.PI / 2, 0, 0]));
-          g.add(slab(0.86, 0.86, 0.05, 0.02, 0.006, M.darkMetal, [0, 0.065, 0], [-Math.PI / 2, 0, 0]));          // socket
-          g.add(slab(0.7, 0.7, 0.05, 0.03, 0.01, M.pcb, [0, 0.11, 0], [-Math.PI / 2, 0, 0]));                   // substrate
-          g.add(slab(0.56, 0.56, 0.05, 0.05, 0.012, M.alu, [0, 0.155, 0], [-Math.PI / 2, 0, 0]));               // heat spreader
-          for (let k = 0; k < 10; k++) g.add(cyl(0.035, 0.035, 0.09, M.alu, [-0.7 + k * 0.155, 0.065, -0.66]));    // capacitors
-          for (let k = 0; k < 6; k++) g.add(rbox(0.13, 0.05, 0.13, 0.01, M.black, [0.7, 0.045, -0.45 + k * 0.17]));   // power stages
-          for (let k = 0; k < 4; k++) g.add(rbox(0.06, 0.1, 1.2, 0.01, M.black, [-0.72 + k * 0.09, 0.07, 0.1]));      // memory slots
+          const pcb = real('#0d6b35'), black = real('#16181c'), steel = real('#aab0b8'), silver = real('#b9bfc8'), grey = real('#5c636d'), fin = real('#3b414b'), gold = real('#c9962f');
+          const g = group(slab(1.9, 1.9, 0.04, 0.03, 0.006, pcb, [0, 0.02, 0], [-Math.PI / 2, 0, 0]));
+          g.add(plane(1.88, 1.88, ink(1024, 1024, (x, w, h) => {
+            x.strokeStyle = 'rgba(214,170,70,0.45)'; x.lineWidth = 2.5;                                            // copper/gold traces
+            for (let k = 0; k < 160; k++) { let px = hash(k) * w, py = hash(k + 50) * h; x.beginPath(); x.moveTo(px, py); for (let t = 0; t < 4; t++) { if ((k + t) % 2) px += (hash(k * 5 + t) - 0.5) * 300; else py += (hash(k * 7 + t) - 0.5) * 300; x.lineTo(px, py); } x.stroke(); }   // traces turn at right angles
+            x.fillStyle = 'rgba(230,230,230,0.9)'; x.font = '600 22px Rubik';
+            [['CPU1', 360, 300], ['DIMM_A1', 780, 160], ['DIMM_B1', 860, 160], ['VRM_12+2', 120, 120], ['M.2_1 (PCIe 5.0)', 300, 880], ['BIOS', 720, 900], ['CHA_FAN1', 40, 960]].forEach(([t, X, Y]) => x.fillText(t, X, Y));
+            x.fillStyle = 'rgba(30,30,30,0.85)'; for (let k = 0; k < 260; k++) x.fillRect(hash(k + 900) * w, hash(k + 1300) * h, 5, 3);   // SMD parts
+          }), [0, 0.042, 0], [-Math.PI / 2, 0, 0]));
+          // socket, retention frame and lever
+          g.add(slab(0.84, 0.84, 0.05, 0.02, 0.006, black, [-0.1, 0.065, 0.05], [-Math.PI / 2, 0, 0]));
+          for (const [x, z, w, d] of [[-0.1, -0.38, 0.88, 0.04], [-0.1, 0.48, 0.88, 0.04], [-0.53, 0.05, 0.04, 0.9], [0.33, 0.05, 0.04, 0.9]]) g.add(rbox(w, 0.03, d, 0.008, steel, [x, 0.1, z]));
+          g.add(cyl(0.012, 0.012, 0.86, steel, [0.38, 0.1, 0.05], [Math.PI / 2, 0, 0], 12));
+          // the processor: substrate, heat spreader, etched markings
+          g.add(slab(0.68, 0.68, 0.03, 0.02, 0.006, real('#11522c'), [-0.1, 0.105, 0.05], [-Math.PI / 2, 0, 0]));
+          g.add(slab(0.56, 0.56, 0.05, 0.05, 0.012, silver, [-0.1, 0.145, 0.05], [-Math.PI / 2, 0, 0]));
+          g.add(plane(0.5, 0.5, ink(512, 512, (x, w) => {
+            x.fillStyle = '#2a2f38'; x.textAlign = 'center';
+            x.font = '900 92px Rubik'; x.fillText('NEXA', w / 2, 150); x.font = '700 46px Rubik'; x.fillText('N9 · 7950', w / 2, 230);
+            x.font = '500 30px Rubik'; x.fillText('3nm · 16C/32T · 5.7GHz', w / 2, 300); x.fillText('LOT 2611A · ENG SAMPLE', w / 2, 350);
+            for (let i = 0; i < 12; i++) for (let j = 0; j < 12; j++) if (hash(i * 13 + j * 7 + 3) > 0.5) x.fillRect(w / 2 - 48 + i * 8, 390 + j * 8, 8, 8);   // 2D code
+          }), [-0.1, 0.171, 0.05], [-Math.PI / 2, 0, 0]));
+          // VRM: chokes and power stages along two edges, under a finned heatsink
+          for (let k = 0; k < 8; k++) g.add(rbox(0.09, 0.07, 0.09, 0.01, grey, [-0.66 + k * 0.11, 0.075, -0.6]), rbox(0.06, 0.02, 0.06, 0.006, black, [-0.66 + k * 0.11, 0.05, -0.49]));
+          for (let k = 0; k < 6; k++) g.add(rbox(0.09, 0.07, 0.09, 0.01, grey, [-0.8, 0.075, -0.4 + k * 0.11]));
+          g.add(rbox(0.92, 0.04, 0.16, 0.01, fin, [-0.28, 0.13, -0.6]));
+          for (let k = 0; k < 10; k++) g.add(rbox(0.012, 0.09, 0.16, 0.003, fin, [-0.7 + k * 0.094, 0.195, -0.6]));
+          for (let k = 0; k < 9; k++) g.add(cyl(0.028, 0.028, 0.08, gold, [-0.62 + k * 0.1, 0.08, -0.74], undefined, 20));   // solid caps
+          // memory: four slots, two DIMMs standing in them (green boards, black DRAM chips, gold edge)
+          for (let k = 0; k < 4; k++) {
+            const x = 0.5 + k * 0.1;
+            g.add(rbox(0.05, 0.05, 1.3, 0.008, k % 2 ? real('#2b2f36') : black, [x, 0.065, 0.0]));
+            if (k % 2 === 0) {
+              g.add(rbox(0.012, 0.32, 1.25, 0.004, real('#0c5a2e'), [x, 0.25, 0]), rbox(0.014, 0.03, 1.2, 0.002, gold, [x, 0.105, 0]));
+              for (let j = 0; j < 8; j++) for (const sd of [-1, 1]) g.add(rbox(0.006, 0.09, 0.11, 0.002, black, [x + sd * 0.009, 0.26, -0.5 + j * 0.143]));
+            }
+          }
+          // M.2 SSD with its controller, NAND and label; chipset heatsink
+          g.add(slab(0.8, 0.22, 0.012, 0.01, 0.003, real('#0e1f4a'), [-0.15, 0.05, 0.75], [-Math.PI / 2, 0, 0]));
+          g.add(rbox(0.12, 0.02, 0.12, 0.004, black, [-0.47, 0.065, 0.75]), rbox(0.16, 0.02, 0.14, 0.004, black, [-0.3, 0.065, 0.75]));
+          g.add(plane(0.3, 0.12, ink(256, 100, (x, w) => { x.fillStyle = '#f2f2f2'; x.fillRect(0, 0, w, 100); x.fillStyle = '#000'; x.font = '700 30px Rubik'; x.fillText('2TB NVMe', 14, 44); x.font = '400 20px Rubik'; x.fillText('Gen5 x4', 14, 78); }), [0.02, 0.058, 0.75], [-Math.PI / 2, 0, 0]));
+          g.add(rbox(0.36, 0.06, 0.36, 0.02, fin, [0.62, 0.07, 0.78]));
+          for (let k = 0; k < 6; k++) g.add(rbox(0.36, 0.03, 0.012, 0.003, fin, [0.62, 0.11, 0.63 + k * 0.06]));
           g.rotation.x = 0.6; g.position.y = 0.7; return group(g);   // tilted up to the camera
         },
         tower: () => {
@@ -462,25 +550,59 @@
           }
           return hero(g);
         },
-        // a cab-over box truck (6600 x 2300 x 3400 mm, 1 unit = 3.4 m): a short flat-nosed cab, wind deflector, a tall box with
-        // a roll-up rear door, dual rear wheels. No logos.
+        // a cab-over box truck (6600 x 2300 x 3400 mm, 1 unit = 3.4 m) in real colours, see-through (13.11 pilot): white
+        // cab and box as clear shells, and inside them everything a real one has: seats, dash and steering wheel, the
+        // diesel under the cab with its radiator, battery and exhaust, the ladder frame, driveshaft and rear axle, a fuel
+        // tank, and the cargo: pallets of taped cartons on a wooden floor behind a roll-up door. No logos.
         delivery_truck: () => {
-          const R = 0.118, paint = carPaint();
+          const R = 0.118, white = real('#eef1f4', true), win = real('#a9cfee', true), charcoal = real('#2b2f36'), black = real('#17191d'), steel = real('#9aa1ab'),
+            engine = real('#6b7280'), red = real('#b3261e'), wood = real('#a87b4f'), carton = real('#b9895a'), tyre = real('#1b1d21'), rim = real('#c3c8cf');
+          const wm = [tyre, rim, steel, rim];
           const g = group(
-            extrudeZ(prof([[0.42, 0.17], ['a', 0.62, R, 0.155, 0.17], [0.935, 0.17], [0.94, 0.40], ['q', 0.945, 0.44, 0.925, 0.46], [0.895, 0.655], ['q', 0.885, 0.685, 0.85, 0.685], [0.44, 0.685]]), 0.66, 0.03, paint),
-            extrudeZ(prof([[0.44, 0.71], [0.80, 0.71], [0.44, 0.90]]), 0.6, 0.01, paint),
-            rbox(1.30, 0.75, 0.68, 0.015, M.white, [-0.30, 0.625, 0]), rbox(0.008, 0.70, 0.62, 0.003, M.alu, [-0.952, 0.625, 0]),
-            rbox(0.01, 0.18, 0.56, 0.01, M.lens, [0.942, 0.56, 0], [0, 0, 0.15]), rbox(0.012, 0.1, 0.36, 0.005, M.darkMetal, [0.97, 0.30, 0]),
-            rbox(0.07, 0.07, 0.7, 0.015, M.darkMetal, [0.95, 0.17, 0]));
-          for (let k = 1; k < 8; k++) g.add(rbox(0.012, 0.006, 0.62, 0.002, M.white, [-0.956, 0.27 + k * 0.088, 0]));   // the roll-up door's slats
+            extrudeZ(prof([[0.42, 0.17], ['a', 0.62, R, 0.155, 0.17], [0.935, 0.17], [0.94, 0.40], ['q', 0.945, 0.44, 0.925, 0.46], [0.895, 0.655], ['q', 0.885, 0.685, 0.85, 0.685], [0.44, 0.685]]), 0.66, 0.03, white),
+            extrudeZ(prof([[0.44, 0.71], [0.80, 0.71], [0.44, 0.90]]), 0.6, 0.01, white),
+            rbox(1.30, 0.75, 0.68, 0.015, white, [-0.30, 0.625, 0]),
+            rbox(0.01, 0.18, 0.56, 0.01, win, [0.942, 0.56, 0], [0, 0, 0.15]),
+            rbox(0.012, 0.1, 0.36, 0.005, charcoal, [0.97, 0.30, 0]), rbox(0.07, 0.07, 0.7, 0.015, charcoal, [0.95, 0.17, 0]));
+          for (let k = 0; k < 4; k++) g.add(rbox(0.014, 0.012, 0.34, 0.003, steel, [0.975, 0.27 + k * 0.022, 0]));   // grille bars
+          // the cab inside: dashboard, steering wheel on its column, two seats, gear lever
+          g.add(rbox(0.1, 0.06, 0.6, 0.02, charcoal, [0.86, 0.47, 0]));
+          const ring = mesh(new THREE.TorusGeometry(0.075, 0.01, 10, 32), black, [0.8, 0.56, 0.15], [0, Math.PI / 2, 0]); ring.rotation.z = 0.5; g.add(ring);
+          g.add(cyl(0.01, 0.01, 0.14, black, [0.84, 0.52, 0.15], [0, 0, 0.9], 8));
+          for (const z of [0.15, -0.15]) g.add(rbox(0.2, 0.05, 0.22, 0.02, charcoal, [0.64, 0.42, z]), rbox(0.05, 0.24, 0.22, 0.02, charcoal, [0.53, 0.55, z], [0, 0, 0.12]), rbox(0.04, 0.07, 0.12, 0.015, charcoal, [0.51, 0.71, z]));
+          g.add(cyl(0.006, 0.006, 0.08, black, [0.72, 0.45, 0], undefined, 8), sph(0.015, black, [0.72, 0.49, 0]));
+          // under the cab: the engine block with its red valve cover, radiator, battery; exhaust and muffler along the frame
+          g.add(rbox(0.28, 0.14, 0.26, 0.02, engine, [0.66, 0.27, 0]), rbox(0.24, 0.035, 0.18, 0.012, red, [0.66, 0.36, 0]));
+          for (let k = 0; k < 4; k++) g.add(cyl(0.012, 0.012, 0.05, steel, [0.57 + k * 0.06, 0.39, 0.06], undefined, 8));   // injectors
+          g.add(rbox(0.03, 0.2, 0.42, 0.006, charcoal, [0.9, 0.3, 0]), rbox(0.1, 0.08, 0.08, 0.01, black, [0.48, 0.22, 0.22]));
+          g.add(cyl(0.018, 0.018, 1.2, steel, [-0.15, 0.17, -0.12], [0, 0, Math.PI / 2], 12), cyl(0.05, 0.05, 0.22, steel, [0.05, 0.17, -0.12], [0, 0, Math.PI / 2], 20));
+          // ladder frame, crossmembers, driveshaft, axles and the differential
+          for (const z of [0.2, -0.2]) g.add(rbox(1.85, 0.05, 0.05, 0.01, black, [-0.05, 0.20, z]));
+          for (const x of [0.75, 0.3, -0.2, -0.7]) g.add(rbox(0.04, 0.04, 0.4, 0.008, black, [x, 0.2, 0]));
+          g.add(cyl(0.02, 0.02, 0.9, steel, [0.03, 0.15, 0], [0, 0, Math.PI / 2 - 0.05], 12), cyl(0.022, 0.022, 0.6, steel, [-0.5, R, 0], [Math.PI / 2, 0, 0], 12), sph(0.06, engine, [-0.5, R, 0]));
+          g.add(cyl(0.02, 0.02, 0.6, steel, [0.62, R, 0], [Math.PI / 2, 0, 0], 12));
+          // the box inside: wooden floor, two pallets of taped cartons, a couple loose
+          g.add(rbox(1.26, 0.02, 0.64, 0.004, wood, [-0.3, 0.26, 0]));
+          const tape = ink(64, 64, (x) => { x.fillStyle = 'rgba(225,200,150,0.95)'; x.fillRect(26, 0, 12, 64); });
+          for (const px of [-0.68, -0.2]) {
+            g.add(rbox(0.42, 0.035, 0.52, 0.004, wood, [px, 0.29, 0]));
+            const layers = px < -0.4 ? 3 : 2;
+            for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) for (let k = 0; k < layers; k++) {
+              const at = [px - 0.1 + i * 0.2, 0.385 + k * 0.152, -0.125 + j * 0.25];
+              const c = rbox(0.19, 0.15, 0.24, 0.01, carton, at); c.rotation.y = (hash(i * 9 + j * 3 + k * 5 + layers) - 0.5) * 0.1; g.add(c);
+              if (k === layers - 1) g.add(plane(0.19, 0.24, tape, [at[0], at[1] + 0.076, at[2]], [-Math.PI / 2, 0, 0]));
+            }
+          }
+          g.add(rbox(0.16, 0.12, 0.2, 0.01, carton, [0.18, 0.33, 0.18]), rbox(0.14, 0.1, 0.16, 0.01, carton, [0.2, 0.44, 0.16]));
+          // the roll-up rear door: aluminium slats
+          for (let k = 0; k < 9; k++) g.add(rbox(0.014, 0.075, 0.62, 0.003, steel, [-0.955, 0.3 + k * 0.08, 0]));
           for (const s of [1, -1]) {
-            g.add(rbox(1.85, 0.05, 0.05, 0.01, M.black, [-0.05, 0.20, s * 0.2]));
-            g.add(sideFlat([[0.86, 0.47], [0.87, 0.64], [0.62, 0.64], [0.62, 0.47]], s * 0.331, M.lens), seam(0.58, 0.43, 0.4, s * 0.331));
+            g.add(sideFlat([[0.86, 0.47], [0.87, 0.64], [0.62, 0.64], [0.62, 0.47]], s * 0.331, win), seam(0.58, 0.43, 0.4, s * 0.331));
             g.add(rbox(0.012, 0.045, 0.11, 0.006, glow(LAMP, 2.5), [0.972, 0.36, s * 0.24]), rbox(0.01, 0.06, 0.04, 0.005, glow(TAIL, 2), [-0.955, 0.30, s * 0.3]));
-            g.add(rbox(0.03, 0.11, 0.035, 0.008, M.black, [0.90, 0.56, s * 0.40]), rbox(0.01, 0.01, 0.08, 0.003, M.black, [0.90, 0.62, s * 0.36]));
+            g.add(rbox(0.03, 0.11, 0.035, 0.008, black, [0.90, 0.56, s * 0.40]), rbox(0.01, 0.01, 0.08, 0.003, black, [0.90, 0.62, s * 0.36]));
             for (const x of [-0.8, -0.3, 0.2]) g.add(rbox(0.03, 0.015, 0.006, 0.002, glow('#ffb340', 1.5), [x, 0.28, s * 0.343]));
-            g.add(cyl(0.06, 0.06, 0.24, M.alu, [0.18, 0.17, s * 0.27], [0, 0, Math.PI / 2]), rbox(0.01, 0.1, 0.1, 0.003, M.black, [-0.66, 0.1, s * 0.27]));
-            g.add(wheel(R, 0.07, [0.62, R, s * 0.29]), wheel(R, 0.065, [-0.50, R, s * 0.30]), wheel(R, 0.065, [-0.50, R, s * 0.225]));
+            g.add(cyl(0.06, 0.06, 0.24, steel, [0.18, 0.17, s * 0.27], [0, 0, Math.PI / 2]), rbox(0.01, 0.1, 0.1, 0.003, black, [-0.66, 0.1, s * 0.27]));
+            g.add(wheel(R, 0.07, [0.62, R, s * 0.29], 6, wm), wheel(R, 0.065, [-0.50, R, s * 0.30], 6, wm), wheel(R, 0.065, [-0.50, R, s * 0.225], 6, wm));
           }
           return hero(g);
         },
