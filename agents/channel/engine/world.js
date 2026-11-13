@@ -1275,7 +1275,7 @@
       <div style="width:104px;height:104px;border-radius:50%;padding:5px;background:linear-gradient(45deg,#f9ce34,#ee2a7b,#6228d7)"><div style="width:100%;height:100%;border-radius:50%;background:#0b0a24;border:4px solid #12121c;display:flex;align-items:center;justify-content:center;font-size:30px;color:${PAL.accent[1]}">${he ? 'MTK' : 'MTK'}</div></div>
       <div style="text-align:left"><div style="font-size:38px">${he ? 'mortoknow' : 'moretoknow1'}</div><div style="font-size:26px;font-weight:500;opacity:0.65">${he ? 'טכנולוגיה מבפנים' : 'Tech, from the inside'}</div></div>
       <div class="fb" style="position:relative;min-width:250px;text-align:center;padding:18px 34px;border-radius:18px;background:#0095f6;font-size:40px">
-        <span class="f0">${he ? 'עקבו' : 'Follow'}</span><span class="f1" style="display:none">${he ? 'במעקב ✓' : 'Followed ✓'}</span></div></div>`;
+        <span class="f0">${he ? 'עקבו' : 'Follow'}</span><span class="f1" style="display:none">${he ? 'במעקב ✓' : 'Following ✓'}</span></div></div>`;
     const fbtn = card.inner.querySelector('.fb'), f0 = card.inner.querySelector('.f0'), f1 = card.inner.querySelector('.f1');
     const hand = txt(root, '', { x: W / 2, y: 0.47 * H, size: 150, font: F.RUBIK, weight: 400, color: '#FFFFFF', css: { filter: 'drop-shadow(0 10px 18px rgba(0,0,0,0.6))' } });
     // a tap cursor (drawn, so it needs no emoji font on the render machine) with the ripple of the tap
