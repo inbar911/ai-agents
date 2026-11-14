@@ -130,6 +130,13 @@ def worker(job):
     return str(seg)
 
 
+def blank(seg):
+    """True when a chunk has 0.3 s or more of a near-black frame with nothing on it (the background navy is brighter)"""
+    r = subprocess.run([FF, "-v", "info", "-i", str(seg), "-vf", "blackdetect=d=0.3:pix_th=0.035:pic_th=0.98", "-an", "-f", "null", "-"],
+                       capture_output=True, text=True)
+    return "black_start" in r.stderr
+
+
 def make_audio(cfg, cues):
     """out/audio.wav from the sound cues and the optional music. Returns the path or None."""
     if os.environ.get("NOAUDIO") or (not cues and not cfg.get("music")):
@@ -167,6 +174,17 @@ def render_video(preview):
     try:
         with Pool(len(jobs)) as pool:
             segs = pool.map(worker, jobs)
+            # rule: never an empty moment on screen. A browser that came up before the page was ready rendered its whole
+            # chunk black (14.11: the first 5.7 s of a video), so a chunk with a blank stretch is rendered again
+            for k, job in enumerate(jobs):
+                for _ in range(2):
+                    if not blank(segs[k]):
+                        break
+                    print(f"chunk {k} has a blank stretch, rendering it again")
+                    segs[k] = worker(job)
+                else:
+                    if blank(segs[k]):
+                        raise RuntimeError(f"chunk {k} stays blank")
         lst = seg_dir / "list.txt"
         lst.write_text("".join(f"file '{Path(s).as_posix()}'\n" for s in segs), encoding="utf-8")
         out = OUT / ("preview.mp4" if preview else "final.mp4")

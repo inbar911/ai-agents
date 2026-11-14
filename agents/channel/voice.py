@@ -66,6 +66,17 @@ def _words(wav: Path, lang: str) -> list[dict[str, Any]]:
 MAX_SECONDS = 30.0
 
 
+def _squeeze(wav: Path) -> float:
+    """Rule: never a moment where nothing is said. A long pause between lines shrinks to about half a second; returns the length."""
+    tmp = wav.with_name("narration-tight.wav")
+    subprocess.run([shutil.which("ffmpeg") or "ffmpeg", "-v", "error", "-y", "-i", str(wav), "-af",
+                    "silenceremove=stop_periods=-1:stop_duration=0.3:stop_threshold=-45dB:stop_silence=0.15",
+                    "-ar", str(RATE), "-ac", "1", str(tmp)], check=True, timeout=120)
+    tmp.replace(wav)
+    with wave.open(str(wav), "rb") as w:
+        return w.getnframes() / w.getframerate()
+
+
 def _fit(wav: Path, length: float) -> float:
     tempo = min(length / MAX_SECONDS, 1.2)
     tmp = wav.with_name("narration-fit.wav")
@@ -86,7 +97,7 @@ def narrate(segments: list[dict[str, Any]], work: Path, lang: str = "he") -> flo
     audio = b"\0\0" * int(RATE * 0.05) + _speak(prompt)   # talk from the first frame: viewers decide within a second
     with wave.open(str(work / "narration.wav"), "wb") as w:
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(RATE); w.writeframes(audio)
-    length = len(audio) / 2 / RATE
+    length = _squeeze(work / "narration.wav")
     if length > MAX_SECONDS:
         length = _fit(work / "narration.wav", length)
 

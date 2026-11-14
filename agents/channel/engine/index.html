@@ -21,7 +21,8 @@ svg{overflow:visible;display:block}
 // render.py and audio.py read these settings from here.
 window.CONFIG = {
   W: 1080, H: 1920,
-  DUR: Math.ceil((TIMING[TIMING.length - 1].b + 1.2) * 10) / 10,
+  // the video ends soon after the Follow tap (14.11: the Following screen held too long), never before the last word
+  DUR: Math.ceil(Math.max(TIMING[TIMING.length - 1].b + 0.25, (TIMING[TIMING.length - 1].f ?? 0) + 1.3) * 10) / 10,
   FPS: 30,
   bg: '#04030f',
   loop: false,
