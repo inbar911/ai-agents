@@ -126,7 +126,7 @@
       // object, phones and boards and speakers included, stays the one-hue glass so the video keeps the palette (13.11)
       const COLOUR = new Set(['car', 'police_car', 'sports_car', 'pickup_truck', 'delivery_truck', 'semi_truck', 'motorcycle', 'helicopter',
         'chip', 'soda_can', 'globe', 'earth', 'planet', 'saturn', 'lock', 'padlock', 'cardboard_box', 'gas_tank', 'burger', 'pizza', 'pizza_slice',
-        'pizza_box', 'controller', 'controller_ps', 'console_ps', 'console_xbox', 'pc_tower', 'milk_carton', 'coin', 'gold_bars', 'money_bag', 'gift', 'key', 'pine_tree', 'trees', 'mountain', 'campfire', 'water_bottle', 'sofa_red', 'phone', 'phone_ultra', 'laptop', 'earbuds', 'router', 'watch', 'tv', 'tv_flat', 'tv_retro', 'cloud', 'circuit_board', 'motherboard', 'graphics_card', 'ssd', 'city_building', 'city_building_color', 'office_building', 'house', 'factory', 'backpack', 'chest', 'crate', 'door', 'desk_lamp', 'floor_lamp', 'fan', 'fridge', 'microwave', 'washing_machine', 'office_chair', 'open_book', 'sofa', 'radio', 'robot_small', 'rocket', 'satellite', 'satellite_dish', 'deep_space_dish', 'spaceship', 'webb_telescope', 'telescope', 'sail_ship', 'speaker_big', 'monitor', 'ac_unit', 'credit_card', 'pos_terminal', 'calculator', 'camera', 'airplane', 'sim_card', 'barcode_scanner', 'drone', 'vr_headset']);
+        'pizza_box', 'controller', 'controller_ps', 'console_ps', 'console_xbox', 'pc_tower', 'milk_carton', 'coin', 'gold_bars', 'money_bag', 'gift', 'key', 'pine_tree', 'trees', 'mountain', 'campfire', 'water_bottle', 'sofa_red', 'phone', 'phone_ultra', 'laptop', 'earbuds', 'router', 'watch', 'tv', 'tv_flat', 'tv_retro', 'cloud', 'circuit_board', 'motherboard', 'graphics_card', 'ssd', 'city_building', 'city_building_color', 'office_building', 'house', 'factory', 'backpack', 'chest', 'crate', 'door', 'desk_lamp', 'floor_lamp', 'fan', 'fridge', 'microwave', 'washing_machine', 'office_chair', 'open_book', 'sofa', 'radio', 'robot_small', 'rocket', 'satellite', 'satellite_dish', 'deep_space_dish', 'spaceship', 'webb_telescope', 'telescope', 'sail_ship', 'speaker_big', 'monitor', 'ac_unit', 'keyboard', 'credit_card', 'pos_terminal', 'calculator', 'camera', 'airplane', 'sim_card', 'barcode_scanner', 'drone', 'vr_headset']);
       function neonize(root, c, keep = true) {
         // additive glow stacks up: a dense model with many overlapping parts (a NASA rover) burns out to white, so dim it
         let tris = 0; root.traverse(o => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
@@ -711,6 +711,20 @@
         // ─── 14.11: models the topics kept asking for (tap-to-pay, cameras, planes, barcodes, SIM, drones, VR). Real colours,
         // made-up brands only ───
         // a bank card (85.6 x 54 mm, 1 unit = 50 mm): a deep blue face with a wave, the gold chip, the contactless mark
+        // a mechanical keyboard (360 x 130 mm, 1 unit = 100 mm): a black case, six rows of dark keys over a rainbow
+        // underglow, the long space bar and the arrow block
+        keyboard: () => {
+          const g = group(rbox(3.6, 0.16, 1.3, 0.05, real('#16171b', false, { rough: 0.5 }), [0, 0.08, 0]));
+          const cap = real('#2a2c31', false, { rough: 0.55 }), widths = [[15, 0.2], [14, 0.215], [13, 0.23], [12, 0.25], [11, 0.27]];
+          widths.forEach(([n, w], r) => { const z = -0.45 + r * 0.22, total = n * w + (n - 1) * 0.02;
+            for (let k = 0; k < n; k++) { const x = -1.62 + k * (w + 0.02) + w / 2 - (3.24 - total) * 0;
+              if (x + w / 2 > 1.0 + (r === 0 ? 0.62 : 0)) continue;
+              g.add(rbox(w, 0.1, 0.19, 0.03, cap, [x, 0.21, z]), rbox(w * 0.9, 0.012, 0.17, 0.005, glow(`hsl(${(x + 1.7) / 3.4 * 300},90%,60%)`, 1.3), [x, 0.165, z])); } });
+          g.add(rbox(1.3, 0.1, 0.19, 0.03, cap, [-0.6, 0.21, 0.65]), rbox(1.2, 0.012, 0.17, 0.005, glow('#a855f7', 1.3), [-0.6, 0.165, 0.65]));
+          for (const [x, z] of [[1.35, 0.43], [1.12, 0.65], [1.35, 0.65], [1.58, 0.65]]) g.add(rbox(0.2, 0.1, 0.19, 0.03, cap, [x, 0.21, z]), rbox(0.18, 0.012, 0.17, 0.005, glow('#22d3ee', 1.3), [x, 0.165, z]));
+          for (let k = 0; k < 3; k++) g.add(rbox(0.2, 0.1, 0.19, 0.03, cap, [1.12 + k * 0.23, 0.21, -0.45]));
+          g.rotation.set(0.55, 0, 0); g.position.y = 0.4; return group(g);
+        },
         credit_card: () => {
           const face = tex(1024, 646, (x, w, h) => {
             const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#1e3a8a'); g.addColorStop(1, '#6d28d9'); x.fillStyle = g; x.fillRect(0, 0, w, h);
@@ -1236,7 +1250,7 @@
         if (pill) { x.fillStyle = 'rgba(8,6,30,0.75)'; x.strokeStyle = 'rgba(220,215,255,0.9)'; x.lineWidth = 8; x.beginPath(); x.roundRect(6, 6, w - 12, c.height - 12, c.height / 2 - 6); x.fill(); x.stroke(); }
         x.fillStyle = color; x.fillText(text, w / 2, c.height / 2 + 6);
         const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-        const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false, fog: false }));
+        const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false, depthTest: false, fog: false })); s.renderOrder = 999;
         s.scale.set(size * w / c.height, size, 1); return s;
       }
 
@@ -1305,7 +1319,7 @@
           sfx(s.a + 1.05, 'impact', 0.6);
           return (u, on) => {
             const txt = fmt(value * E.o3(seg(u, 0.2, 1.0)));
-            if (txt !== shown) { if (spr) world.remove(spr); spr = textSprite(txt, 0.75, sp.c, true); spr.position.copy(sp.at).add(V(0, sp.h + 0.55, 0)); world.add(spr); shown = txt; }
+            if (txt !== shown) { if (spr) world.remove(spr); spr = textSprite(txt, s.i === 0 ? 0.5 : 0.75, sp.c, true); spr.position.copy(sp.at).add(s.i === 0 ? V(0, 0.15, 0.4) : V(0, sp.h + 0.55, 0)); world.add(spr); shown = txt; }
             spr.visible = on;
           };
         },
@@ -1324,7 +1338,7 @@
       let lastAz = 0.42;
       const keys = SEGS.map((s, i) => {
         const p = spotOf[i], tgt = s.action === 'beam' && s.target ? spots[kinds.indexOf(kindOf(s.target))] : null;
-        let look = centerOf(p).add(V(0, SYM[s.symbol] && !SYM[s.focus] ? 0.1 : -0.35, 0)), az = i % 2 ? -0.42 : 0.42, el = 0.2 + 0.05 * Math.cos(i * 1.3), dist = Math.max(6.4, p.h * 3.2);
+        let look = centerOf(p).add(V(0, i === 0 ? 0.45 : SYM[s.symbol] && !SYM[s.focus] ? -0.1 : -0.45, 0)), az = i % 2 ? -0.42 : 0.42, el = 0.2 + 0.05 * Math.cos(i * 1.3), dist = Math.max(6.4, p.h * 3.2);
         if (tgt && tgt !== p) {
           const a = centerOf(p), b = centerOf(tgt);
           look = a.clone().lerp(b, 0.55); az = Math.atan2(a.x - b.x, a.z - b.z) + 0.15; el = 0.45; dist = a.distanceTo(b) + 6.5;
@@ -1357,7 +1371,7 @@
         pos.add(V(Math.sin(t * 83), Math.cos(t * 71), 0).multiplyScalar(shake));
         return { look, pos };
       };
-      const flashAt = t => 0.7 * kick(t, SLAM, 14) + SEGS.slice(1).reduce((n, s) => n + 0.18 * kick(t, s.a - 0.02, 14), 0);
+      const flashAt = t => 0.3 * kick(t, SLAM, 16) + SEGS.slice(1).reduce((n, s) => n + 0.06 * kick(t, s.a - 0.02, 18), 0);
       SEGS.forEach((s, i) => { if (i) sfx(s.a - 0.22, i % 2 ? 'whoosh' : 'swish', 0.55); });
       hits.forEach(h => sfx(h, 'impact', 0.45));
       sfx(0, 'whoosh', 0.7); sfx(SLAM, 'impact', 1); sfx(SLAM + 0.02, 'sub', 0.8);
@@ -1506,7 +1520,7 @@
       let a0 = s.a;
       for (const c of chunks) {
         const len = (s.b - s.a) * c.join(' ').length / total;
-        const e = txt(root, '', { x: W / 2, y: 0.66 * H, size: 66, font: F.RUBIK, weight: 900, color: '#0F172A', dir: DIR,
+        const e = txt(root, '', { x: W / 2, y: 0.76 * H, size: 66, font: F.RUBIK, weight: 900, color: '#0F172A', dir: DIR,
           css: { background: '#FFFFFF', borderRadius: '18px', padding: '14px 32px', boxShadow: '0 10px 30px rgba(15,23,42,0.18)' } });
         e.inner.innerHTML = c.map(hot).join(' ');
         caps.push({ e, a: a0, b: a0 + len }); a0 += len;
