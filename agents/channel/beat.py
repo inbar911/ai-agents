@@ -61,7 +61,37 @@ def place(buf, x, at):
     if i < len(buf): buf[i:i + len(x)] += x[:len(buf) - i]
 
 
-BEAT_ON = False
+# 15.11: real music under the voice. Kevin MacLeod tracks (CC BY 4.0, credit in every caption), picked by Gemini for
+# energy and fit against the reel Inbar liked (uplifting electronic ~120 BPM); 70 s cuts that start on the full groove,
+# kept in the private bucket channel-music (not in this public repo). name -> BPM (the engine syncs its cuts to it).
+TRACKS = {"digital_lemonade": 128, "voxel_revolution": 128, "electrodoodle": 125, "hyperfun": 126, "rhinoceros": 124, "pamgaea": 118}
+MUSIC_BUCKET = "channel-music"
+CREDIT = "Music: Kevin MacLeod (incompetech.com) · CC BY 4.0"
+
+
+def fetch_track(name: str, root: Path) -> bool:
+    """work/music.mp3 from the bucket; False (a video with voice only) when it can't be fetched."""
+    try:
+        from lib.supabase_client import sb
+        (root / "music.mp3").write_bytes(sb().storage.from_(MUSIC_BUCKET).download(f"{name}.mp3"))
+        return True
+    except Exception as e:
+        print(f"[channel] music {name} not fetched: {e}", file=sys.stderr)
+        return False
+
+
+def music(root: Path, n: int) -> np.ndarray | None:
+    """work/music.mp3 decoded to n mono samples (looped if short), or None."""
+    f = root / "music.mp3"
+    if not f.exists():
+        return None
+    import shutil, subprocess
+    raw = subprocess.run([shutil.which("ffmpeg") or "ffmpeg", "-v", "error", "-i", str(f), "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"],
+                         capture_output=True, check=True, timeout=120).stdout
+    x = np.frombuffer(raw, np.float32).astype(np.float64)
+    if len(x) == 0:
+        return None
+    return np.tile(x, n // len(x) + 1)[:n]
 
 
 def main(root: Path, mood: str = "pop") -> None:
@@ -72,9 +102,9 @@ def main(root: Path, mood: str = "pop") -> None:
     total = len(voice) / SR + 1.2
     beat = np.zeros(int(total * SR) + SR)
     step = 60 / m["bpm"] / 4
-    # 15.11: no beat in the file. Inbar adds a trending Instagram sound when he uploads (a synthesized beat scored 3/10
-    # energy against the reel he wanted, and trending audio also gets pushed by the algorithm). Voice and SFX only.
-    for k in range(int(total / step) if BEAT_ON else 0):
+    track = music(root, len(beat))
+    # the synthesized groove is only the fallback when no track could be fetched (it scored 3/10 energy vs. real music)
+    for k in range(int(total / step) if track is None else 0):
         t, s, bar = k * step, k % 16, k // 16
         full = t >= drop - 0.01
         if m["kick"][s] == "1" and (full or s == 0): place(beat, kick() * (1 if full else 0.5), t)
@@ -85,6 +115,9 @@ def main(root: Path, mood: str = "pop") -> None:
         if m["pad"] and s == 0: place(beat, synth(root_f * 2, step * 16, "pad"), t)
         if m["arp"] and full and s % 2 == 0: place(beat, synth(root_f * (2, 3, 4, 3)[(s // 2) % 4], step * 2, "arp"), t)
     # duck the beat under the voice (envelope follower), gently: it should still be heard while he talks
+    if track is not None:   # the music plays from the first frame and fades out at the end
+        fade = np.ones(len(beat)); k = int(0.8 * SR); fade[-k:] = np.linspace(1, 0, k)
+        beat = track * fade
     v = np.zeros_like(beat); v[:len(voice)] = np.abs(voice)
     win = int(0.08 * SR)
     envv = np.convolve(v, np.ones(win) / win, "same")

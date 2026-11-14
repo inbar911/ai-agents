@@ -13,6 +13,7 @@ import base64
 import json
 import re
 import os
+import random
 import shutil
 import subprocess
 import sys
@@ -45,8 +46,12 @@ def _ffmpeg() -> str:
 def make_video(topic: str, lang: str, palette: str, work: Path, hooks: list[str] | None = None, notes: str | None = None) -> dict[str, Any]:
     script = writer.write_script(topic, lang, hooks, notes)
     shutil.copytree(ENGINE, work, dirs_exist_ok=True)
+    track = random.choice(list(beat.TRACKS))
+    if beat.fetch_track(track, work):   # CC BY: the credit goes into the caption
+        script["caption"] = f"{script['caption']}\n\n{beat.CREDIT}".strip()
+    bpm = beat.TRACKS[track] if (work / "music.mp3").exists() else beat.MOODS[script["mood"]]["bpm"]
     segments = [{k: v for k, v in s.items() if k not in ("tone", "say")} for s in script["segments"]]
-    (work / "video.js").write_text("window.VIDEO = " + json.dumps({"segments": segments, "lang": lang, "title": script["title"], "palette": palette, "env": script.get("env", "studio"), "envModels": ENV_MODELS.get(script.get("env", "studio"), []), "bpm": beat.MOODS[script["mood"]]["bpm"]}, ensure_ascii=False) + ";\n", encoding="utf-8")
+    (work / "video.js").write_text("window.VIDEO = " + json.dumps({"segments": segments, "lang": lang, "title": script["title"], "palette": palette, "env": script.get("env", "studio"), "envModels": ENV_MODELS.get(script.get("env", "studio"), []), "bpm": bpm}, ensure_ascii=False) + ";\n", encoding="utf-8")
     _pack_models(script["segments"], work, script.get("env", "studio"))
     length = voice.narrate(script["segments"], work, lang)
     beat.main(work, script["mood"])
@@ -105,8 +110,7 @@ def publish(v: dict[str, Any]) -> int:
     post = f"{v['title']}\n\n{v['caption']}\n\n{' '.join(v['hashtags'])}"
     checked = f"\n\n🔎 נבדק מול: {', '.join(v['sources'])}" if v.get("sources") else "\n\n⚠️ בלי מחקר (החיפוש נכשל)"
     flag = FLAG[v["lang"]]
-    # the video has no beat (15.11): the reminder rides on top so it survives the 1024-char cut
-    send_video(v["file"], f"{flag} 🎬 #{row['id']} 🎵 להוסיף סאונד טרנדי באינסטגרם\n\n{post}{checked}\n\n{critic.summary(v.get('review'))}"[:1024], "marketing", agent="channel")
+    send_video(v["file"], f"{flag} 🎬 #{row['id']} {post}{checked}\n\n{critic.summary(v.get('review'))}"[:1024], "marketing", agent="channel")
     if v["cover"]:
         send_image_file(v["cover"], f"{flag} 🖼️ קאבר לסרטון #{row['id']}", "marketing")
     r = v.get("review")
