@@ -22,7 +22,8 @@ MODELS = ["gemini-2.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemi
 
 # Must match OBJ, SYM and ACT in engine/world.js.
 OBJECTS = ["phone", "phone_ultra", "laptop", "soda_can", "cardboard_box", "router", "earbuds", "watch", "tv", "server", "chip", "tower", "satellite", "cloud", "globe",
-           "lock", "charger", "controller", "controller_ps", "console_ps", "console_xbox", "pc_tower", "car", "house"]
+           "lock", "charger", "controller", "controller_ps", "console_ps", "console_xbox", "pc_tower", "car", "house",
+           "credit_card", "pos_terminal", "calculator", "camera", "airplane", "sim_card", "barcode_scanner", "drone", "vr_headset"]
 SYMBOLS = ["wifi", "bluetooth", "signal", "pin", "battery", "bell", "heart", "check", "cross", "bolt", "eye", "chat", "play",
            "gear", "shield", "fingerprint", "sound", "camera_icon"]
 # the model library (engine/models): ~130 CC0 / NASA models, each with tags the writer picks from

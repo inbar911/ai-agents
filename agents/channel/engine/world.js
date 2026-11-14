@@ -126,7 +126,7 @@
       // object, phones and boards and speakers included, stays the one-hue glass so the video keeps the palette (13.11)
       const COLOUR = new Set(['car', 'police_car', 'sports_car', 'pickup_truck', 'delivery_truck', 'semi_truck', 'motorcycle', 'helicopter',
         'chip', 'soda_can', 'globe', 'earth', 'planet', 'saturn', 'lock', 'padlock', 'cardboard_box', 'gas_tank', 'burger', 'pizza', 'pizza_slice',
-        'pizza_box', 'controller', 'controller_ps', 'console_ps', 'console_xbox', 'pc_tower', 'milk_carton', 'coin', 'gold_bars', 'money_bag', 'gift', 'key', 'pine_tree', 'trees', 'mountain', 'campfire', 'water_bottle', 'sofa_red']);
+        'pizza_box', 'controller', 'controller_ps', 'console_ps', 'console_xbox', 'pc_tower', 'milk_carton', 'coin', 'gold_bars', 'money_bag', 'gift', 'key', 'pine_tree', 'trees', 'mountain', 'campfire', 'water_bottle', 'sofa_red', 'phone', 'phone_ultra', 'laptop', 'earbuds', 'router', 'watch', 'tv', 'tv_flat', 'tv_retro', 'cloud', 'circuit_board', 'motherboard', 'graphics_card', 'ssd', 'city_building', 'city_building_color', 'office_building', 'house', 'factory', 'backpack', 'chest', 'crate', 'door', 'desk_lamp', 'floor_lamp', 'fan', 'fridge', 'microwave', 'washing_machine', 'office_chair', 'open_book', 'sofa', 'radio', 'robot_small', 'rocket', 'satellite', 'satellite_dish', 'deep_space_dish', 'spaceship', 'webb_telescope', 'telescope', 'sail_ship', 'speaker_big', 'monitor', 'ac_unit', 'credit_card', 'pos_terminal', 'calculator', 'camera', 'airplane', 'sim_card', 'barcode_scanner', 'drone', 'vr_headset']);
       function neonize(root, c, keep = true) {
         // additive glow stacks up: a dense model with many overlapping parts (a NASA rover) burns out to white, so dim it
         let tris = 0; root.traverse(o => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
@@ -708,6 +708,123 @@
         // DualSense style (160 x 106 x 66 mm, 1 unit = 100 mm): a white two-tone shell, the black centre with both sticks
         // side by side, the white touchpad with the blue light bar, the D-pad and four face buttons, the PS-style home and
         // mic buttons. No logos and no button symbols.
+        // ─── 14.11: models the topics kept asking for (tap-to-pay, cameras, planes, barcodes, SIM, drones, VR). Real colours,
+        // made-up brands only ───
+        // a bank card (85.6 x 54 mm, 1 unit = 50 mm): a deep blue face with a wave, the gold chip, the contactless mark
+        credit_card: () => {
+          const face = tex(1024, 646, (x, w, h) => {
+            const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#1e3a8a'); g.addColorStop(1, '#6d28d9'); x.fillStyle = g; x.fillRect(0, 0, w, h);
+            x.fillStyle = 'rgba(255,255,255,0.08)'; x.beginPath(); x.ellipse(w * 0.85, h * 0.2, 420, 260, -0.4, 0, Math.PI * 2); x.fill();
+            x.fillStyle = '#ffffff'; x.font = '800 64px Rubik'; x.fillText('MORE BANK', 70, 110);
+            x.font = '600 58px Rubik'; x.fillText('4921  ••••  ••••  1337', 70, 470); x.font = '500 36px Rubik'; x.fillText('VALID 09/29', 70, 560);
+            x.strokeStyle = '#ffffff'; x.lineWidth = 10; x.lineCap = 'round'; for (let i = 0; i < 3; i++) { x.beginPath(); x.arc(860, 300, 40 + i * 32, -0.7, 0.7); x.stroke(); }
+            x.font = '900 60px Rubik'; x.fillStyle = '#ffffff'; x.textAlign = 'right'; x.fillText('MTK', 960, 580);
+          });
+          const g = group(slab(1.71, 1.08, 0.025, 0.06, 0.006, real('#1e3a8a', false, { rough: 0.3, coat: 1 }), [0, 0, 0]),
+            plane(1.69, 1.06, Object.assign(new THREE.MeshBasicMaterial({ map: face }), { userData: { decal: true } }), [0, 0, 0.0135]),
+            rbox(0.24, 0.19, 0.01, 0.03, M.gold, [-0.5, 0.06, 0.016]));
+          for (let i = 0; i < 3; i++) g.add(rbox(0.235, 0.004, 0.012, 0.001, M.darkMetal, [-0.5, i * 0.06, 0.017]));
+          g.position.y = 0.9; g.rotation.y = -0.25; return group(g);
+        },
+        // a card terminal (75 x 160 x 50 mm, 1 unit = 100 mm): a graphite body, a lit screen asking for the tap, the keypad
+        // with the green / yellow / red keys, and the receipt slot on top
+        pos_terminal: () => {
+          const scr = tex(512, 400, (x, w, h) => {
+            x.fillStyle = '#0b1220'; x.fillRect(0, 0, w, h); x.fillStyle = '#ffffff'; x.textAlign = 'center'; x.font = '700 46px Rubik'; x.fillText('₪ 24.90', w / 2, 90);
+            x.font = '500 30px Rubik'; x.fillStyle = '#9ca3af'; x.fillText('Tap your card', w / 2, 140);
+            x.strokeStyle = '#22c55e'; x.lineWidth = 12; x.lineCap = 'round'; for (let i = 0; i < 4; i++) { x.beginPath(); x.arc(w / 2 - 50, 270, 30 + i * 26, -0.75, 0.75); x.stroke(); }
+          });
+          const body = real('#26282d', false, { rough: 0.5 }), parts = [rbox(0.78, 1.6, 0.36, 0.1, body, [0, 0.8, 0]), rbox(0.7, 0.12, 0.3, 0.05, M.black, [0, 1.62, -0.02]),
+            rbox(0.6, 0.48, 0.02, 0.03, M.black, [0, 1.22, 0.18]), plane(0.56, 0.44, screenMat(scr), [0, 1.22, 0.192])];
+          const key = (c, at) => parts.push(rbox(0.15, 0.09, 0.04, 0.02, c, at));
+          for (let r = 0; r < 4; r++) for (let k = 0; k < 3; k++) key(M.white, [(k - 1) * 0.19, 0.84 - r * 0.13, 0.19]);
+          key(real('#ef4444'), [-0.19, 0.3, 0.19]); key(real('#facc15'), [0, 0.3, 0.19]); key(real('#22c55e'), [0.19, 0.3, 0.19]);
+          const g = group(...parts); g.rotation.x = -0.12; return group(g);
+        },
+        // a pocket calculator (80 x 150 x 12 mm, 1 unit = 80 mm): the LCD with its digits, the solar strip, grey number keys,
+        // orange operators and the red clear key
+        calculator: () => {
+          const lcd = tex(512, 160, (x, w, h) => { x.fillStyle = '#b8c9a3'; x.fillRect(0, 0, w, h); x.fillStyle = '#1f2a1a'; x.font = '600 110px "Courier New"'; x.textAlign = 'right'; x.fillText('3.14159', w - 24, 122); });
+          const parts = [slab(1.0, 1.85, 0.12, 0.08, 0.02, real('#2b2d33', false, { rough: 0.5 }), [0, 0, 0]), rbox(0.86, 0.3, 0.02, 0.02, M.black, [0, 0.66, 0.065]),
+            plane(0.8, 0.25, screenMat(lcd), [0, 0.66, 0.077]), rbox(0.36, 0.08, 0.02, 0.01, real('#3a2a1d', false, { metal: 0.4, rough: 0.2 }), [0.22, 0.86, 0.065])];
+          for (let r = 0; r < 5; r++) for (let k = 0; k < 4; k++) {
+            const c = r === 0 && k === 0 ? '#dc2626' : k === 3 ? '#f59e0b' : r === 0 ? '#8a8f99' : '#5b5f69';
+            parts.push(rbox(0.18, 0.15, 0.05, 0.04, real(c, false, { rough: 0.35, coat: 0.4 }), [(k - 1.5) * 0.215, 0.33 - r * 0.2, 0.075]));
+          }
+          const g = group(...parts); g.position.y = 0.95; g.rotation.x = -0.18; return group(g);
+        },
+        // a mirrorless camera (130 x 90 x 70 mm, 1 unit = 100 mm): the black body and grip, the viewfinder hump, the lens
+        // barrel with its grip ribs and red ring, the glass, shutter button and dials
+        camera: () => {
+          const b = real('#1b1c20', false, { rough: 0.6 }), g = group(rbox(1.3, 0.86, 0.5, 0.08, b, [0, 0.43, 0]), rbox(0.3, 0.84, 0.7, 0.12, b, [0.52, 0.43, 0.08]),
+            rbox(0.42, 0.3, 0.44, 0.06, b, [-0.1, 0.94, -0.02]), cyl(0.36, 0.36, 0.32, M.black, [-0.1, 0.43, 0.4], [Math.PI / 2, 0, 0], 48),
+            cyl(0.34, 0.33, 0.3, real('#2a2b30', false, { rough: 0.8 }), [-0.1, 0.43, 0.7], [Math.PI / 2, 0, 0], 48),
+            mesh(new THREE.TorusGeometry(0.345, 0.012, 8, 64), real('#dc2626'), [-0.1, 0.43, 0.58]),
+            cyl(0.27, 0.27, 0.02, M.lens, [-0.1, 0.43, 0.86], [Math.PI / 2, 0, 0], 48), sph(0.12, glow('#6d5dfc', 0.5), [-0.1, 0.43, 0.8]),
+            cyl(0.08, 0.08, 0.06, M.chrome, [0.5, 0.9, 0.12]), cyl(0.14, 0.14, 0.08, M.darkMetal, [0.32, 0.9, -0.05]), cyl(0.12, 0.12, 0.07, M.darkMetal, [-0.48, 0.89, -0.05]));
+          for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; g.add(rbox(0.02, 0.02, 0.22, 0.005, M.darkMetal, [-0.1 + Math.cos(a) * 0.35, 0.43 + Math.sin(a) * 0.35, 0.7])); }
+          g.rotation.y = 0.45; return group(g);
+        },
+        // a twin-engine airliner seen side-on and a little from above: the white fuselage with the window line, the swept
+        // wings with engines, the blue tail and belly stripe
+        airplane: () => {
+          const W = real('#f4f5f7', false, { rough: 0.35, coat: 0.6 }), blue = real('#1d4ed8', false, { rough: 0.3, coat: 0.6 });
+          const fus = mesh(new THREE.CapsuleGeometry(0.22, 2.4, 8, 24), W, [0, 0, 0], [0, 0, Math.PI / 2]);
+          const wing = (s) => { const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(0.5, 0); sh.lineTo(0.05, 1.5 * s); sh.lineTo(-0.15, 1.5 * s); sh.closePath();
+            return mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.03, bevelEnabled: false }), W, [0.05, -0.08, 0], [Math.PI / 2, 0, 0]); };
+          const fin = new THREE.Shape(); fin.moveTo(0, 0); fin.lineTo(0.45, 0); fin.lineTo(0.2, 0.62); fin.lineTo(0.02, 0.62); fin.closePath();
+          const g = group(fus, wing(1), wing(-1), mesh(new THREE.ExtrudeGeometry(fin, { depth: 0.03, bevelEnabled: false }), blue, [-1.42, 0.12, -0.015]),
+            rbox(0.36, 0.02, 0.7, 0.01, W, [-1.32, 0.05, 0]),
+            cyl(0.09, 0.08, 0.32, M.alu, [0.05, -0.2, 0.55], [0, 0, Math.PI / 2]), cyl(0.09, 0.08, 0.32, M.alu, [0.05, -0.2, -0.55], [0, 0, Math.PI / 2]),
+            cyl(0.07, 0.07, 0.01, M.black, [0.215, -0.2, 0.55], [0, 0, Math.PI / 2]), cyl(0.07, 0.07, 0.01, M.black, [0.215, -0.2, -0.55], [0, 0, Math.PI / 2]),
+            rbox(2.5, 0.05, 0.02, 0.01, blue, [0, -0.1, 0.215]), rbox(0.16, 0.1, 0.02, 0.02, M.black, [1.28, 0.07, 0.17]));
+          for (let i = 0; i < 16; i++) g.add(cyl(0.025, 0.025, 0.02, M.black, [-1.0 + i * 0.13, 0.06, 0.218], [Math.PI / 2, 0, 0], 12));
+          g.position.y = 0.7; g.rotation.set(0.25, -0.5, 0.06); return group(g);
+        },
+        // a nano SIM (12.3 x 8.8 mm, scaled up): the white card with its cut corner and the gold contacts
+        sim_card: () => {
+          const s = new THREE.Shape(); s.moveTo(-0.62, -0.88); s.lineTo(0.62, -0.88); s.lineTo(0.62, 0.62); s.lineTo(0.36, 0.88); s.lineTo(-0.62, 0.88); s.closePath();
+          const g = group(mesh(new THREE.ExtrudeGeometry(s, { depth: 0.06, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.01, bevelSegments: 2 }), real('#eceef1', false, { rough: 0.4 }), [0, 0, -0.03]),
+            rbox(0.9, 1.1, 0.02, 0.06, M.gold, [0, -0.05, 0.04]));
+          for (const [x, y, w, h] of [[-0.23, 0.22, 0.4, 0.3], [0.23, 0.22, 0.4, 0.3], [-0.23, -0.12, 0.4, 0.3], [0.23, -0.12, 0.4, 0.3], [-0.23, -0.43, 0.4, 0.24], [0.23, -0.43, 0.4, 0.24]])
+            g.add(rbox(w, h, 0.012, 0.01, real('#e2b24a', false, { metal: 1, rough: 0.2 }), [x, y, 0.052]));
+          g.position.y = 0.95; g.rotation.y = -0.3; return group(g);
+        },
+        // a handheld barcode scanner aimed at a product box: the yellow-and-black gun, the trigger, the red laser line on
+        // the box's barcode
+        barcode_scanner: () => {
+          const y = real('#f2c21b', false, { rough: 0.4, coat: 0.5 }), k = real('#1b1c20', false, { rough: 0.6 });
+          const code = tex(512, 300, (x, w, h) => { x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h); x.fillStyle = '#000'; let p = 30; for (let i = 0; i < 46 && p < w - 30; i++) { const bw = [3, 5, 8, 3, 11][(i * 7) % 5]; x.fillRect(p, 20, bw, 220); p += bw + [4, 6, 3][i % 3]; } x.font = '600 40px "Courier New"'; x.fillText('7 290011 583948', 70, 285); });
+          const head = group(rbox(0.5, 0.42, 0.95, 0.12, y, [0, 0, 0]), rbox(0.42, 0.34, 0.04, 0.06, M.black, [0, 0, 0.48]), rbox(0.3, 0.3, 0.5, 0.08, k, [0, 0.04, -0.2]));
+          const handle = rbox(0.34, 0.85, 0.36, 0.12, k, [0, -0.48, -0.3], [-0.35, 0, 0]), trig = rbox(0.12, 0.22, 0.1, 0.04, real('#dc2626'), [0, -0.26, -0.02], [-0.3, 0, 0]);
+          const gun = group(head, handle, trig); gun.position.set(-0.45, 1.2, 0); gun.rotation.set(0.25, 0.9, 0); gun.scale.setScalar(0.75);
+          const box = group(rbox(1.0, 1.0, 1.0, 0.02, real('#d9c7a6'), [0.5, 0.5, 0]), plane(0.7, 0.42, Object.assign(new THREE.MeshBasicMaterial({ map: code }), { userData: { decal: true } }), [0.5, 0.55, 0.505]));
+          const laser = mesh(new THREE.PlaneGeometry(0.78, 0.015), glow('#ff2a2a', 3), [0.5, 0.57, 0.51]);
+          return group(gun, box, laser);
+        },
+        // a quadcopter drone: the white body with a dark top, four arms with motors and blurred props, the gimbal camera
+        // underneath and the green / red nav lights
+        drone: () => {
+          const W = real('#eceef1', false, { rough: 0.35, coat: 0.6 }), parts = [rbox(0.7, 0.24, 1.0, 0.1, W, [0, 0, 0]), rbox(0.5, 0.06, 0.7, 0.06, real('#2a2b30'), [0, 0.13, 0]),
+            rbox(0.2, 0.18, 0.2, 0.05, M.black, [0, -0.2, 0.38]), cyl(0.07, 0.07, 0.04, M.lens, [0, -0.2, 0.48], [Math.PI / 2, 0, 0])];
+          [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([sx, sz], i) => {
+            parts.push(rbox(0.9, 0.06, 0.08, 0.03, W, [sx * 0.45, 0.02, sz * 0.4], [0, sx * sz * 0.72, 0]), cyl(0.07, 0.07, 0.14, M.darkMetal, [sx * 0.78, 0.08, sz * 0.7]),
+              cyl(0.42, 0.42, 0.005, Object.assign(new THREE.MeshBasicMaterial({ color: 0x9aa3b5, transparent: true, opacity: 0.22, depthWrite: false }), { userData: { decal: true } }), [sx * 0.78, 0.16, sz * 0.7], [0, 0, 0], 40),
+              rbox(0.8, 0.008, 0.06, 0.004, M.black, [sx * 0.78, 0.165, sz * 0.7], [0, i * 0.8, 0]), sph(0.03, glow(sz > 0 ? (sx > 0 ? '#22c55e' : '#ef4444') : '#ffffff', 2), [sx * 0.78, -0.02, sz * 0.7]));
+          });
+          const g = group(...parts); g.position.y = 0.9; g.rotation.set(0.35, 0.5, 0); return group(g);
+        },
+        // a VR headset: the white visor with its dark glossy front, the grey face cushion, the strap and the tracking
+        // cameras on the front corners
+        vr_headset: () => {
+          const W = real('#eceef1', false, { rough: 0.35, coat: 0.6 }), g = group(rbox(1.5, 0.82, 0.62, 0.22, W, [0, 0, 0]), rbox(1.36, 0.68, 0.06, 0.18, real('#121317', false, { rough: 0.08, coat: 1 }), [0, 0, 0.31]),
+            rbox(1.3, 0.66, 0.2, 0.2, real('#5b5f69', false, { rough: 0.9 }), [0, 0, -0.38]),
+            mesh(new THREE.TorusGeometry(0.85, 0.06, 10, 48, Math.PI), real('#2a2b30', false, { rough: 0.8 }), [0, 0, -0.85], [Math.PI / 2, 0, Math.PI]),
+            rbox(0.24, 0.1, 0.22, 0.05, real('#2a2b30'), [0, 0.47, -0.6]));
+          for (const [x, y] of [[-0.55, 0.22], [0.55, 0.22], [-0.55, -0.22], [0.55, -0.22]]) g.add(cyl(0.045, 0.045, 0.02, M.lens, [x, y, 0.345], [Math.PI / 2, 0, 0], 20));
+          g.add(rbox(0.5, 0.02, 0.01, 0.005, glow('#6d5dfc', 1.6), [0, -0.3, 0.345]));
+          g.position.y = 0.8; g.rotation.y = 0.5; return group(g);
+        },
         controller_ps: () => {
           const s = new THREE.Shape();
           s.moveTo(-0.32, 0.42); s.lineTo(0.32, 0.42);
