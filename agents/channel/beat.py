@@ -61,6 +61,9 @@ def place(buf, x, at):
     if i < len(buf): buf[i:i + len(x)] += x[:len(buf) - i]
 
 
+BEAT_ON = False
+
+
 def main(root: Path, mood: str = "pop") -> None:
     m = MOODS.get(mood, MOODS["pop"])
     voice = narration(root)
@@ -69,7 +72,9 @@ def main(root: Path, mood: str = "pop") -> None:
     total = len(voice) / SR + 1.2
     beat = np.zeros(int(total * SR) + SR)
     step = 60 / m["bpm"] / 4
-    for k in range(int(total / step)):
+    # 15.11: no beat in the file. Inbar adds a trending Instagram sound when he uploads (a synthesized beat scored 3/10
+    # energy against the reel he wanted, and trending audio also gets pushed by the algorithm). Voice and SFX only.
+    for k in range(int(total / step) if BEAT_ON else 0):
         t, s, bar = k * step, k % 16, k // 16
         full = t >= drop - 0.01
         if m["kick"][s] == "1" and (full or s == 0): place(beat, kick() * (1 if full else 0.5), t)
