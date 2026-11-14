@@ -192,10 +192,10 @@ Who watches: a 16-year-old scrolling fast who knows NOTHING technical and will s
 The video is ONE dark neon hologram world that tells the story: the real objects involved stand in it as glowing 3D
 models, the camera flies to the object each line talks about, and the objects interact (a router beams data to the
 phone, a tower sends waves). When the story comes back to an object, use the same object again (the router stays
-the router). But keep the picture moving: a DIFFERENT model on most lines, never more than 2 lines in a row on the
-same model, and at least 5 different models in the video (the parts of the process: where it starts, what carries it,
-what receives it, who uses it). A fact about one thing (a number, an ID, a code) goes on a related model with a symbol
-or a count, not on the same object again and again. For each line also pick a "symbol" that pops up over the object to show what the line says: the line
+the router). RELEVANCE FIRST: a model is on screen only when the line talks about it or it is a real part of the
+process the line describes. Never add a model just for variety (Inbar, 15.11: random unrelated models in the middle
+of a video kill it); 3-4 models that belong beat 7 that don't. Keep the picture moving with the actions instead (a
+beam, an explosion into its parts, a count, a spin), not with unrelated objects. For each line also pick a "symbol" that pops up over the object to show what the line says: the line
 says "Wi-Fi" → wifi over the router; "password" → lock over the phone; "signal" → signal; "notification" → bell.
 Only when the line literally names that thing: no symbol is better than a decorative one (never an eye or a gear just
 to fill the frame), at most 3 in a video.
@@ -209,6 +209,16 @@ Rules that matter more than anything:
   "that's how"). Give the hard step one everyday picture (the router shouts in light waves, the chip is a tiny
   bouncer checking IDs). After the video the viewer must be able to explain to a friend HOW it works, not just WHAT.
   Bad: "Your phone sends a signal. The tower receives it." Good: "Your voice becomes *waves*, so the tower can catch it."
+What makes people watch to the end (from the marketing videos Inbar collected, 14.11):
+- The first seconds give the context fast and open a question the viewer NEEDS answered (an open loop). Frame the topic
+  as something that touches the viewer personally (a risk, a loss, something done to them, a thing they believed that
+  is wrong), never as a neutral "how X works".
+- Right after the hook comes a CONTRAST moment: a surprising number or "you think X, but actually Y".
+- Then a story loop, not a lecture: stakes (why it matters to YOU right now) -> the big question -> each line answers a
+  little and immediately opens the next question (a rehook: "but how does it know it's you?") -> one unexpected twist
+  -> the payoff. Tension rises and releases every 2-3 lines; never two calm lines in a row.
+- The answer to the hook's question comes at the END (the payoff), never in the first half, or they leave.
+- What is written on screen is exactly what is said; every line changes something on screen.
 Structure:
 1. hook: 5-9 words, shown as a giant headline from the first frame. Most viewers swipe away within 2-3 seconds,
    so it must be understood in ONE second, talk to "you", hit something the viewer owns or does every day, and carry
@@ -221,11 +231,14 @@ Structure:
    Never a soft or generic opener ("ever wondered how Wi-Fi works?", "in this video", "let's talk about").
    Also give "hook_options": 2 MORE hooks for the same script, each on a DIFFERENT formula, same rules, with one
    *key word* each. The best-scoring of the three is used.
-2. tease: one short line that makes the hook worse or weirder (a number, "and you allowed it", "every 3 seconds").
+   The hook = the viewer's pain or risk + an open loop. Bad: "How Face ID works". Good: "Your face unlocks more than your *phone*".
+2. contrast: one short line that makes the hook worse or flips what they believe (a number, "and you said yes to it",
+   "you think it's the camera. It's not.").
 3. 3-5 lines that explain HOW it works as a chain of cause and effect: each line is the next step and why it
-   happens, each a new mini-reveal; before the last reveal a line like "but that's not the crazy part".
-4. payoff: one line that makes it click ("so that's why...") and repeats one key word from the hook, so the replay
-   loops back into the hook cleanly.
+   happens, each a new mini-reveal that ends by opening the next question; before the last reveal a twist line like
+   "but that's not the crazy part".
+4. payoff: one line that answers the hook's question and makes it click ("so that's why...") and repeats one key word
+   from the hook, so the replay loops back into the hook cleanly.
 5. last: the follow line below.
 Pace: max 8 words per line (10 for an explain line that needs its "because"), 8-10 lines, 70-85 words in total,
 20-28 seconds. Hard limit 30 seconds: anything longer is sped up. Every line must change something on screen (a new object, a
@@ -261,7 +274,7 @@ Return JSON only:
     problem = _variety_problem(script["segments"])
     if problem:   # one rewrite: a video stuck on one model looks empty (Inbar on #43: a soda can on 8 of 11 lines)
         print(f"[channel] variety: {problem}; rewriting", file=sys.stderr)
-        retry = _valid_script(_gemini(prompt + f"\n\nYour last script broke the variety rule: {problem}. Rewrite it with more different models."), lang)
+        retry = _valid_script(_gemini(prompt + f"\n\nYour last script broke the variety rule: {problem}. Fix it with a model the story really involves or a different action, never an unrelated model."), lang)
         if not _variety_problem(retry["segments"]) or _distinct(retry["segments"]) > _distinct(script["segments"]):
             script = retry
     return {**script, "lang": lang, "sources": found["sources"], "researched": bool(found["facts"])}
@@ -272,13 +285,13 @@ def _distinct(segs: list[dict[str, Any]]) -> int:
 
 
 def _variety_problem(segs: list[dict[str, Any]]) -> str | None:
-    """None when the script keeps the picture moving: at least 5 models (or one per 2 lines in a short one), no 3 lines in a row on one."""
-    need = min(5, (len(segs) + 1) // 2)
-    if _distinct(segs) < need:
-        return f"only {_distinct(segs)} different models in {len(segs)} lines (need {need})"
+    """None unless the video is stuck: fewer than 3 models, or one model on 3 lines in a row doing the same thing.
+    It never asks for more models than the story has (15.11: forcing 5 filled videos with unrelated ones)."""
+    if _distinct(segs) < min(3, len(segs)):
+        return f"only {_distinct(segs)} different models in {len(segs)} lines"
     for i in range(len(segs) - 2):
-        if segs[i]["focus"] == segs[i + 1]["focus"] == segs[i + 2]["focus"]:
-            return f"'{segs[i]['focus']}' on 3 lines in a row (lines {i + 1}-{i + 3})"
+        if segs[i]["focus"] == segs[i + 1]["focus"] == segs[i + 2]["focus"] and segs[i]["action"] == segs[i + 1]["action"] == segs[i + 2]["action"]:
+            return f"'{segs[i]['focus']}' doing '{segs[i]['action']}' on 3 lines in a row (lines {i + 1}-{i + 3})"
     return None
 
 
