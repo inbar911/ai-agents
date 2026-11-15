@@ -31,6 +31,8 @@ from lib.supabase_client import log_run, sb
 
 INLINE_LIMIT = 19 * 1024 * 1024  # Gemini inline_data cap is 20MB per request
 IMAGE_HOSTS = re.compile(r"(?:^|\.)(?:fbcdn\.net|cdninstagram\.com)$", re.I)
+# GitHub's runners get YouTube's "confirm you're not a bot" wall, so YouTube is never downloaded: Gemini watches the link itself
+YOUTUBE_ID = re.compile(r"(?:youtu\.be/|/shorts/|/live/|/embed/|[?&]v=)([\w-]{11})")
 ALLOWED_HOSTS = re.compile(r"^(?:www\.|m\.|vm\.|vt\.)?(instagram\.com|tiktok\.com|youtube\.com|youtu\.be)$", re.I)
 
 PROMPT = """Watch this short video (title: "{title}") and summarize it for Inbar, {who}, who saves videos to learn from them.
@@ -89,13 +91,29 @@ def _post_images(url: str) -> tuple[str, list[dict[str, Any]]]:
     return (info.get("title") or "Instagram post"), parts
 
 
+def _youtube(url: str) -> tuple[str, list[dict[str, Any]]]:
+    """A public YouTube video (Short or long) as a link Gemini opens directly, and its title from YouTube's oEmbed."""
+    m = YOUTUBE_ID.search(url)
+    if not m:
+        raise RuntimeError("לא מצאתי בקישור מזהה של סרטון יוטיוב")
+    watch = f"https://www.youtube.com/watch?v={m.group(1)}"
+    title = "YouTube"
+    try:
+        res = httpx.get("https://www.youtube.com/oembed", params={"url": watch, "format": "json"}, timeout=20)
+        if res.is_success:
+            title = str(res.json().get("title") or title)[:200]
+    except (httpx.HTTPError, ValueError):
+        pass
+    return title, [{"file_data": {"file_uri": watch}}]
+
+
 def _valid(s: Any) -> bool:
     strs = lambda v: isinstance(v, list) and 0 < len(v) <= 12 and all(isinstance(x, str) and x.strip() for x in v)  # noqa: E731
     return isinstance(s, dict) and all(isinstance(s.get(k), str) and s[k].strip() for k in ("title", "gist", "category")) \
         and strs(s.get("points")) and strs(s.get("takeaways"))
 
 
-def _summarize(title: str, media: list[dict[str, Any]], prompt: str = PROMPT) -> dict[str, Any]:
+def _summarize(title: str, media: list[dict[str, Any]], prompt: str = PROMPT, low_res: bool = False) -> dict[str, Any]:
     key = bot_secret("gemini_key")
     if not key:
         raise RuntimeError("missing bot secret: gemini_key")
@@ -104,7 +122,8 @@ def _summarize(title: str, media: list[dict[str, Any]], prompt: str = PROMPT) ->
             *media,
             {"text": prompt.format(title=title.replace('"', "'"), who=who())},
         ]}],
-        "generationConfig": {"responseMimeType": "application/json"},
+        # a long YouTube video at low resolution costs about a third of the tokens; the talk is what gets summarized
+        "generationConfig": {"responseMimeType": "application/json", **({"mediaResolution": "MEDIA_RESOLUTION_LOW"} if low_res else {})},
     }
     # flash is often briefly overloaded (503): wait and retry, then fall back to flash-lite (it watches video too)
     models = ["gemini-2.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
@@ -132,15 +151,19 @@ def _process(job: dict[str, Any]) -> bool:
         host = urlparse(job["url"]).hostname or ""
         if urlparse(job["url"]).scheme != "https" or not ALLOWED_HOSTS.match(host):
             raise RuntimeError(f"host not allowed: {host}")
-        try:
-            with tempfile.TemporaryDirectory(prefix="jarvis-video-") as tmp:
-                title, video = _download(job["url"], Path(tmp))
-            summary = _summarize(title, [{"inline_data": {"mime_type": "video/mp4", "data": base64.b64encode(video).decode()}}])
-        except RuntimeError as e:
-            if "No video formats" not in str(e):
-                raise
-            title, slides = _post_images(job["url"])
-            summary = _summarize(title, slides, POST_PROMPT)
+        if YOUTUBE_ID.search(job["url"]) and "youtu" in host:
+            title, link = _youtube(job["url"])
+            summary = _summarize(title, link, low_res=True)
+        else:
+            try:
+                with tempfile.TemporaryDirectory(prefix="jarvis-video-") as tmp:
+                    title, video = _download(job["url"], Path(tmp))
+                summary = _summarize(title, [{"inline_data": {"mime_type": "video/mp4", "data": base64.b64encode(video).decode()}}])
+            except RuntimeError as e:
+                if "No video formats" not in str(e):
+                    raise
+                title, slides = _post_images(job["url"])
+                summary = _summarize(title, slides, POST_PROMPT)
         category = summary["category"] if summary["category"] in CATEGORIES else "אחר"
         tags = [t.strip()[:30] for t in summary.get("tags") or [] if isinstance(t, str) and t.strip()][:5]
         sb().table("knowledge_items").update({
