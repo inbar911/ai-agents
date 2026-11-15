@@ -127,19 +127,28 @@ def _summarize(title: str, media: list[dict[str, Any]], prompt: str = PROMPT, lo
     }
     # flash is often briefly overloaded (503): wait and retry, then fall back to flash-lite (it watches video too)
     models = ["gemini-2.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
+    status = 0
     for i, model in enumerate(models):
         res = httpx.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
                          headers={"x-goog-api-key": key}, json=body, timeout=180)
-        if res.status_code in (429, 500, 503) and i < len(models) - 1:
-            time.sleep(15 * (i + 1))
+        status = res.status_code
+        if status in (429, 500, 503):
+            if i < len(models) - 1:
+                time.sleep(15 * (i + 1))
             continue
-        break
-    if not res.is_success:
-        raise RuntimeError(f"Gemini עמוס כרגע ({res.status_code}). אפשר לשלוח את הקישור שוב בעוד כמה דקות.")
-    parsed = json.loads(res.json()["candidates"][0]["content"]["parts"][0]["text"])
-    if not _valid(parsed):
-        raise RuntimeError("gemini returned an unexpected shape")
-    return parsed
+        res.raise_for_status()
+        # Gemini sometimes breaks its own JSON (a stray quote in Hebrew text): the next try usually comes back clean
+        try:
+            parsed = json.loads(res.json()["candidates"][0]["content"]["parts"][0]["text"])
+        except (KeyError, IndexError, ValueError) as e:
+            print(f"[video] {model}: unusable answer ({e})", file=sys.stderr)
+            continue
+        if _valid(parsed):
+            return parsed
+        print(f"[video] {model}: unexpected shape", file=sys.stderr)
+    if status in (429, 500, 503):
+        raise RuntimeError(f"Gemini עמוס כרגע ({status}). אפשר לשלוח את הקישור שוב בעוד כמה דקות.")
+    raise RuntimeError("Gemini לא החזיר סיכום תקין גם אחרי כמה ניסיונות")
 
 
 def _process(job: dict[str, Any]) -> bool:
