@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 import httpx
 
 from lib.bot_data import bot_secret
+from lib.usage import gemini_tokens, track
 from lib.notify import send_telegram
 from lib.profile import who
 from lib.memory import remember
@@ -132,6 +133,7 @@ def _summarize(title: str, media: list[dict[str, Any]], prompt: str = PROMPT, lo
         res = httpx.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
                          headers={"x-goog-api-key": key}, json=body, timeout=180)
         status = res.status_code
+        track("gemini", model, status, gemini_tokens(res.json()) if res.is_success else None)
         if status in (429, 500, 503):
             if i < len(models) - 1:
                 time.sleep(15 * (i + 1))

@@ -17,6 +17,7 @@ from typing import Any
 import httpx
 
 from lib.bot_data import bot_secret
+from lib.usage import gemini_tokens, track
 
 BAR = 7        # at or above: publish as is
 FLOOR = 5      # below this after the one retry: don't publish
@@ -74,6 +75,7 @@ def review(video: Path, script: dict[str, Any], lang: str) -> dict[str, Any] | N
         }
         for i, model in enumerate(MODELS):
             r = httpx.post(MODEL.format(model), headers={"x-goog-api-key": key}, json=body, timeout=240)
+            track("gemini", model, r.status_code, gemini_tokens(r.json()) if r.is_success else None)
             if r.status_code in (429, 500, 503) and i < len(MODELS) - 1:
                 time.sleep(15 * (i + 1))
                 continue

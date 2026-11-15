@@ -11,6 +11,7 @@ import httpx
 
 from lib.bot_data import bot_secret
 from lib.llm import ask_json
+from lib.usage import gemini_tokens, track
 
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent"
 MODELS = ["gemini-2.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
@@ -35,7 +36,9 @@ def gemini_json(prompt: str, temperature: float = 0.6, models: list[str] = MODEL
             })
         except httpx.HTTPError as e:
             print(f"[gemini] {model}: {type(e).__name__}", file=sys.stderr)
+            track("gemini", model, 0)
             continue
+        track("gemini", model, r.status_code, gemini_tokens(r.json()) if r.is_success else None)
         if _daily(r):
             _spent.add(model)
             print(f"[gemini] {model}: daily quota is out", file=sys.stderr)

@@ -15,6 +15,7 @@ from typing import Any
 import httpx
 
 from lib.bot_data import bot_secret
+from lib.usage import gemini_tokens, track
 
 RATE = 24000
 VOICE = "Puck"
@@ -41,6 +42,7 @@ def _speak(prompt: str) -> bytes:
             json={"contents": [{"parts": [{"text": prompt}]}],
                   "generationConfig": {"responseModalities": ["AUDIO"],
                                        "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": VOICE}}}}})
+        track("gemini", "gemini-2.5-flash-preview-tts", r.status_code, gemini_tokens(r.json()) if r.is_success else None)
         if r.status_code == 429:
             if "PerDay" in r.text:
                 raise QuotaExhausted("Gemini TTS daily free quota is used up (resets ~10:00 Israel time)")
@@ -57,6 +59,7 @@ def _words(wav: Path, lang: str) -> list[dict[str, Any]]:
                    data={"model": "whisper-large-v3", "language": lang, "response_format": "verbose_json",
                          "timestamp_granularities[]": "word"},
                    files={"file": ("n.wav", wav.read_bytes(), "audio/wav")})
+    track("groq", "whisper-large-v3", r.status_code)
     r.raise_for_status()
     return r.json().get("words") or []
 

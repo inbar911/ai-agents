@@ -14,6 +14,7 @@ from groq import BadRequestError, Groq, RateLimitError
 
 from lib.config import require
 from lib.memory import learned
+from lib.usage import track
 
 _client: Groq | None = None
 # llama-3.3-70b-versatile was decommissioned by Groq — every agent run 404'd
@@ -288,8 +289,10 @@ def ask_json(system: str, payload: Any, max_tokens: int = 2500, temperature: flo
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
+            track("groq", MODEL, 200, getattr(resp.usage, "total_tokens", None))
             break
         except RateLimitError:
+            track("groq", MODEL, 429)
             if attempt == 3:
                 raise
             time.sleep(25 * (attempt + 1))

@@ -15,6 +15,7 @@ import httpx
 from agents.channel.igkit import hookscore, humanize
 from lib.bot_data import bot_secret
 from lib.gemini import gemini_json
+from lib.usage import gemini_tokens, track
 from lib.memory import learned
 
 MOODS = {"pop", "lofi", "electro", "chill", "trap"}
@@ -69,6 +70,7 @@ Answer as plain lines, each starting with "FACT: "."""}]}],
     for i, model in enumerate(["gemini-2.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"]):
         try:
             r = httpx.post(MODEL.format(model), headers={"x-goog-api-key": key}, timeout=120, json=body)
+            track("gemini", model, r.status_code, gemini_tokens(r.json()) if r.is_success else None)
             if r.status_code in (429, 500, 503) and i < 2:
                 time.sleep(15 * (i + 1))
                 continue
