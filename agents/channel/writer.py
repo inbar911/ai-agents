@@ -14,6 +14,7 @@ import httpx
 
 from agents.channel.igkit import hookscore, humanize
 from lib.bot_data import bot_secret
+from lib.gemini import gemini_json
 from lib.memory import learned
 
 MOODS = {"pop", "lofi", "electro", "chill", "trap"}
@@ -48,24 +49,8 @@ ACTIONS = {
 
 
 def _gemini(prompt: str, temperature: float = 0.9) -> Any:
-    key = bot_secret("gemini_key")
-    if not key:
-        raise RuntimeError("missing bot secret: gemini_key")
-    # flash is often briefly overloaded (503); retry it, then fall back to flash-lite
-    for i, model in enumerate(MODELS):
-        r = httpx.post(MODEL.format(model), headers={"x-goog-api-key": key}, timeout=180, json={
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseMimeType": "application/json", "temperature": temperature},
-        })
-        if r.status_code in (429, 500, 503) and i < len(MODELS) - 1:
-            time.sleep(15 * (i + 1))   # overloads can last minutes; this waits ~5 min in total
-            continue
-        r.raise_for_status()
-        try:
-            return json.loads(r.json()["candidates"][0]["content"]["parts"][0]["text"])
-        except (KeyError, ValueError):
-            continue
-    raise RuntimeError("gemini returned no usable JSON")
+    # flash is often briefly overloaded (503): it gets retried, then flash-lite; Groq answers when Gemini's quota is out
+    return gemini_json(prompt, temperature, MODELS)
 
 
 def research(topic: str) -> dict[str, Any]:

@@ -282,7 +282,7 @@ def ask_json(system: str, payload: Any, max_tokens: int = 2500, temperature: flo
                 model=MODEL,
                 messages=[
                     {"role": "system", "content": system},
-                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+                    {"role": "user", "content": payload if isinstance(payload, str) else json.dumps(payload, ensure_ascii=False)},
                 ],
                 response_format={"type": "json_object"},
                 temperature=temperature,

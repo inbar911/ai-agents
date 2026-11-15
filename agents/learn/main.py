@@ -9,38 +9,21 @@ Run: `python -m agents.learn.main`
 """
 from __future__ import annotations
 
-import json
 import sys
-import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-import httpx
-
-from lib.bot_data import bot_secret
+from lib.gemini import gemini_json
 from lib.memory import prefs
 from lib.notify import send_telegram
 from lib.supabase_client import log_run, sb
 
-MODEL = "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent"
-MODELS = ["gemini-2.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
 NAMES = {"morning": "☀️ בוקר", "study": "📚 לימודים", "mail": "📬 מיילים", "ideas": "💡 רעיונות", "marketer": "🎥 שיווק",
          "channel": "📱 ערוץ", "weekly": "📊 שבועי"}
 
 
 def _gemini(prompt: str) -> dict[str, Any]:
-    key = bot_secret("gemini_key")
-    if not key:
-        raise RuntimeError("missing bot secret: gemini_key")
-    for i, model in enumerate(MODELS):
-        r = httpx.post(MODEL.format(model), headers={"x-goog-api-key": key}, timeout=120, json={
-            "contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"responseMimeType": "application/json", "temperature": 0.3}})
-        if r.status_code in (429, 500, 503) and i < len(MODELS) - 1:
-            time.sleep(15 * (i + 1))
-            continue
-        r.raise_for_status()
-        return json.loads(r.json()["candidates"][0]["content"]["parts"][0]["text"])
-    raise RuntimeError("gemini unreachable")
+    return gemini_json(prompt, 0.3)
 
 
 def _learn(agent: str, liked: list[str], disliked: list[str]) -> dict[str, Any] | None:

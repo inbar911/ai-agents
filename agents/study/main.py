@@ -9,15 +9,14 @@ Run: `python -m agents.study.main`
 """
 from __future__ import annotations
 
-import json
 import sys
-import time
 from datetime import date, timedelta
 from typing import Any
 
 import httpx
 
-from lib.bot_data import bot_secret, free_windows, il_today
+from lib.bot_data import free_windows, il_today
+from lib.gemini import gemini_json
 from lib.notify import request, send_telegram
 from lib.profile import profile
 from lib.memory import guidance, remember
@@ -25,8 +24,6 @@ from lib.supabase_client import log_run, sb
 
 AHEAD = 7
 MAHBERET = "https://mahberet.vercel.app/api/subjects"
-MODEL = "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent"
-MODELS = ["gemini-2.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
 # exam title word → the subject name(s) in מחברת
 SUBJECTS = [("לשון", ["לשון"]), ("אנגלית", ["אנגלית"]), ("הסטוריה", ["היסטוריה"]), ("היסטוריה", ["היסטוריה"]),
             ("מתמטיקה", ["מתמטיקה"]), ("כלכלה", ["כלכלה"]), ("ספרדית", ["ספרדית"])]
@@ -56,20 +53,7 @@ def _materials(names: list[str]) -> dict[str, list[str]]:
 
 
 def _gemini(prompt: str) -> dict[str, Any]:
-    key = bot_secret("gemini_key")
-    if not key:
-        raise RuntimeError("missing bot secret: gemini_key")
-    for i, model in enumerate(MODELS):
-        r = httpx.post(MODEL.format(model), headers={"x-goog-api-key": key}, timeout=120, json={
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseMimeType": "application/json", "temperature": 0.6},
-        })
-        if r.status_code in (429, 500, 503) and i < len(MODELS) - 1:
-            time.sleep(15 * (i + 1))
-            continue
-        r.raise_for_status()
-        return json.loads(r.json()["candidates"][0]["content"]["parts"][0]["text"])
-    raise RuntimeError("gemini unreachable")
+    return gemini_json(prompt, 0.6)
 
 
 def _valid(p: Any) -> bool:
