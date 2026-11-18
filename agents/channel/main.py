@@ -35,7 +35,7 @@ BUCKET = "channel-videos"
 PLAN = [("he", int(os.getenv("CHANNEL_HE", "1"))), ("en", int(os.getenv("CHANNEL_EN", "3")))]
 STARTED = time.monotonic()
 BUDGET = 130 * 60       # the job is killed at 150 min; leave room for setup and the last upload
-PER_VIDEO = 25 * 60     # a render + review, measured ~23 min
+PER_VIDEO = 30 * 60     # a render + review: hologram ~23 min (measured), board ~25 min (estimated 18.11)
 FLAG = {"en": "🇺🇸", "he": "🇮🇱"}
 
 
@@ -44,6 +44,13 @@ def _ffmpeg() -> str:
 
 
 def make_video(topic: str, lang: str, palette: str, work: Path, hooks: list[str] | None = None, notes: str | None = None) -> dict[str, Any]:
+    # English reels use the board style since 18.11 (Noa asks, Claude answers at a whiteboard); its font has no Hebrew,
+    # so Hebrew stays on the hologram engine. CHANNEL_STYLE=holo switches English back.
+    if lang == "en" and os.getenv("CHANNEL_STYLE", "board") == "board":
+        from agents.channel.board import make as board
+        hint = ("Inbar's candidate hooks for this idea (use the strongest as Noa's first line, in your own words): "
+                + " | ".join(hooks)) if hooks else None
+        return board.make_video(topic, work, "\n".join(x for x in (hint, notes) if x) or None)
     script = writer.write_script(topic, lang, hooks, notes)
     shutil.copytree(ENGINE, work, dirs_exist_ok=True)
     track = random.choice(list(beat.TRACKS))

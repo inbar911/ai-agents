@@ -25,7 +25,7 @@ INLINE_LIMIT = 19 * 1024 * 1024
 MODEL = "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent"
 MODELS = ["gemini-2.5-flash", "gemini-2.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
 
-PROMPT = """You review a {lang} faceless animated Instagram Reel (a 3D neon hologram world that explains how a piece of tech works) before it is posted.
+PROMPT = """You review a {lang} animated Instagram Reel that explains how a piece of tech works (either a 3D neon hologram world, or a 3D room where a teen asks and a small orange AI answers on a whiteboard) before it is posted.
 Its audience: a 16-year-old scrolling fast who knows nothing technical and swipes away the second it gets boring.
 The channel's own numbers: 34-93% of viewers swipe away in the first seconds and almost nobody shares. So judge hardest:
 1. The first 2 seconds: is something moving, and is the hook (ideally a concrete number or the thing in action) on screen and readable at once?
