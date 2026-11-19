@@ -78,7 +78,7 @@ def jargon(lines: list[dict[str, Any]]) -> list[str]:
     """Words a teen wouldn't know, unless the same line explains them (a dash, "which means", "like", "basically")."""
     out = []
     for L in lines:
-        explained = re.search(r"[—–-] |which means|basically|like a|meaning", L["text"], re.I)
+        explained = re.search(r"[—–-] |which means|basically|like a|meaning|that's (?:called )?(?-i:[A-Z]{2,5})\b", L["text"], re.I)
         for m in JARGON.finditer(L["text"]):
             w = m.group(0)
             if w.upper() in OK_CAPS or (w.isupper() and len(w) <= 1) or explained:
