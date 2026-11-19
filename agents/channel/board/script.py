@@ -104,7 +104,11 @@ def jargon(lines: list[dict[str, Any]]) -> list[str]:
 
 
 def _prompt(topic: str, facts: list[str], notes: str | None) -> str:
-    return f"""Write a 35-50 second Instagram Reel as a dialogue that explains: {topic}
+    # 20.11: a topic addressed to Claude ("Claude, how can you use my email and not steal my password?") is Noa's line 1,
+    # asked to Claude by name, almost word for word; the rest of the dialogue answers it
+    ask = (f'\nTHE TOPIC IS A QUESTION TO CLAUDE: line 1 is Noa asking Claude this exact question by name, in his own words '
+           f'(keep it close to: "{topic}"). Claude answers it; the GOLD beats continue from his answer.') if re.search(r"claude", topic, re.I) else ""
+    return f"""Write a 35-50 second Instagram Reel as a dialogue that explains: {topic}{ask}
 Researched facts (use ONLY these for claims and numbers):
 {chr(10).join(f"- {f}" for f in facts) or "- (no research available: keep claims general and certainly true)"}
 {f"A reviewer watched the previous version; keep the same topic and idea but fix this: {notes}" if notes else ""}
