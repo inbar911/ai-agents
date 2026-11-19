@@ -107,7 +107,9 @@ export async function buildBoard(script, words, VO) {
   const panels = (script.panels || []).filter(p => p.items?.length);
   // items in time order inside each panel, so one pen never has to go back in time
   panels.forEach(p => p.items.sort((a, b) => at(a.at) - at(b.at)));
+  const BELOW = { L: 'BL', C: 'BC', R: 'BR' };
   panels.forEach((p, pi) => {
+    const used = new Set(p.items.map(it => it.slot));   // 19.11: labels and long texts ran into their neighbours
     for (const it of p.items) {
       const t = at(it.at) - .1, slot = SLOTS[it.slot] || SLOTS.C;
       const color = INK[it.color] ? it.color : null;
@@ -116,12 +118,14 @@ export async function buildBoard(script, words, VO) {
         const f = ICONS[it.icon] || ICONS.box, [x, y] = slot;
         D(K, f(x, y), t, t + .85, { minGap: .02, maxGap: .05 });
         boxes[it.id] = [x - 160, y - 150, x + 160, y + 150];
-        if (it.label) { const lab = String(it.label).slice(0, 18); D(K, T(lab, x, y + 205, { h: 46, w: 6, align: 'center' }), t + .9, t + .9 + Math.min(1.1, .25 + lab.length * .05)); }
+        if (it.label && !used.has(BELOW[it.slot])) { const lab = String(it.label).slice(0, 18); D(K, T(lab, x, y + 205, { h: 46, w: 6, align: 'center' }), t + .9, t + .9 + Math.min(1.1, .25 + lab.length * .05)); }
         if (it.icon === 'box' && it.text) D(K, T(String(it.text).slice(0, 8), x, y + 18, { h: 50, w: 6, align: 'center' }), t + .9, t + 1.4);
       } else if (it.type === 'text' || it.type === 'big') {
         const big = it.type === 'big', s = String(it.text || '').slice(0, big ? 10 : 24), h = big ? 170 : (it.slot === 'TOP' || it.slot === 'BOTTOM' ? 56 : 52);
         const pen = big ? O : PEN[color || 'black'], [x, y] = slot;
-        const strokes = T(s, x, y + h * .35, { h, w: big ? 18 : 7, align: 'center' });
+        let strokes = T(s, x, y + h * .35, { h, w: big ? 18 : 7, align: 'center' });
+        const room = it.slot === 'TOP' || it.slot === 'BOTTOM' ? 1400 : 460;   // a cell is 500 px wide
+        if (strokes.width > room) strokes = T(s, x, y + h * .35 * room / strokes.width, { h: h * room / strokes.width, w: big ? 18 : 7, align: 'center' });
         D(pen, strokes, t, t + Math.min(big ? 1.0 : 1.6, .3 + s.length * (big ? .12 : .055)), { minGap: .015, maxGap: .04 });
         boxes[it.id] = [x - strokes.width / 2 - 20, y - h * .7, x + strokes.width / 2 + 20, y + h * .5];
         if (big) { bigs.push({ t, x, y }); tl.cue(t, 'pop'); }
