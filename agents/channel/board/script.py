@@ -93,7 +93,7 @@ Researched facts (use ONLY these for claims and numbers):
 {chr(10).join(f"- {f}" for f in facts) or "- (no research available: keep claims general and certainly true)"}
 {f"A reviewer watched the previous version; keep the same topic and idea but fix this: {notes}" if notes else ""}
 The two characters: NOA, a curious teenage guy (the viewer's voice: confused, skeptical, funny), and CLAUDE, a small
-friendly orange AI who explains with a grin and a pointer. 12-18 lines, 90-130 words in total, alternating mostly
+friendly orange AI who explains with a grin and a pointer. 12-18 lines, 100-145 words in total, alternating mostly
 (Claude may have two lines in a row once).
 {EXPLAIN}
 {RULES}
@@ -126,8 +126,9 @@ def validate(s: Any, strict: bool = True) -> dict[str, Any]:
     if not 8 <= len(lines) <= 22:
         raise ValueError(f"{len(lines)} lines")
     words = sum(len(L["text"].split()) for L in lines)
-    if not 55 <= words <= 165:
-        raise ValueError(f"{words} words (keep it to 90-130)")
+    # explaining in full sentences runs long (19.11: drafts of 166-172 words); the last try only has to fit ~60 s
+    if not 55 <= words <= (185 if strict else 210):
+        raise ValueError(f"{words} words (keep it to 100-145)")
     bad = jargon(lines)
     if bad and strict:   # the last try is let through rather than losing the video
         raise ValueError(f"jargon a 12-year-old won't know, say the everyday thing instead: {', '.join(bad)}")
