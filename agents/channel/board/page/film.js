@@ -218,6 +218,16 @@ export async function build(glCanvas, uiCanvas) {
     const items = B.lineItems[L.id] || [], t = VO[L.id] - .12;
     const big = B.bigs.find(g => g.t >= t - .2 && g.t < B.voEnd(L.id));
     let shot;
+    // 19.11 (Inbar: "no zoom on the characters"): a line that draws on the board opens on its speaker's face and cuts to
+    // the board only when the pen starts; if the line goes on after the drawing, it cuts back to the face
+    const face = () => (L.speaker === 'noa' ? noaCU() : claudeHero());
+    if (items.length && !big) {
+      const ts = items.map(it => B.at(it.at)), t1 = Math.min(...ts), t2 = Math.max(...ts) + 1.4, end = B.voEnd(L.id);
+      if (t1 - t > 1.0) { SHOTS.push({ t, ...face() }); }
+      SHOTS.push({ t: Math.max(t, t1 - .35), ...(side++ % 2 ? boardR : boardL)() });
+      if (end - t2 > 1.3) { SHOTS.push({ t: t2, ...face() }); lastKind = L.speaker === 'noa' ? 'noa' : 'claude'; } else lastKind = 'board';
+      return;
+    }
     if (i === lines.length - 1 && !items.length) shot = wideR();
     else if (items.length) shot = (side++ % 2 ? boardR : boardL)();
     else if (L.speaker === 'noa') shot = noaCU();

@@ -18,6 +18,21 @@ SLOTS = ["L", "C", "R", "BL", "BC", "BR", "TOP", "BOTTOM"]
 STALE = ["4.80", "kiss the reader", "another coffee", "ticket that tears", "not your card number", "waved my phone at a box"]
 TYPES = {"icon", "text", "big", "arrow", "cross", "check", "circle"}
 
+EXPLAIN = """THE WHOLE POINT OF THE CHANNEL: AFTER 45 SECONDS THE VIEWER CAN EXPLAIN HOW IT WORKS TO A FRIEND.
+(19.11, Inbar: the scripts sounded human but were not interesting and did not explain; one used "ETA" and nobody knew what it was.)
+- Claude walks through the mechanism step by step, in the order it really happens: what happens first, what that
+  causes, what happens next, until the end result. 3-5 steps. Each step is one Claude line that explains ONE thing in
+  plain words, 8-16 words, a full sentence with a cause word (because / so / which means / that's why).
+- Noa's lines stay short; Claude's explanation lines are full sentences, never one-word answers or fragments like
+  "Encrypted. Scrambled." A one-word reply ("Nope.") is fine only as a reaction, followed by the real explanation.
+- ZERO JARGON. Words a 12-year-old doesn't know are banned: no acronyms (ETA, GPS, API, AI model names, NFC...), no tech
+  terms (encryption, servers, data center, algorithm, neural network, protocol, latency...). Say the everyday thing
+  instead: "how long until you arrive", "turned into a secret code only your phone can read", "a giant room of
+  computers". If the topic itself needs one term, explain it in the same line in everyday words the first time.
+- No name-dropping as an explanation: "Google uses DeepMind's Graph Neural Networks" explains nothing. Say what it DOES.
+- Interesting = a surprise in every step: something the viewer didn't expect about their own phone, money or friends.
+- Before the end, one line (Noa's) sums up the whole mechanism in a few everyday words, so the viewer feels "I get it"."""
+
 RULES = """HOW IT MUST SOUND (this matters more than anything; scripts that "sound like AI" are rejected):
 - It is a real conversation between two friends, not a lecture read in two voices.
 - Line 1 is Noa in the middle of a real, specific moment from a teenager's day WITH THIS TOPIC: a real object, a real
@@ -54,14 +69,33 @@ ICONS: {icons}. Pick the icon that IS the thing (phone for a phone). If none fit
 Put a "big" item on the 1-2 most important words of the video only. Draw what is said, as it is said."""
 
 
+JARGON = re.compile(r"\b[A-Z]{2,5}s?\b|(?i:\b(?:encrypt\w*|server\w*|data ?cent(?:er|re)s?|algorithm\w*|neural|protocol\w*|latency|"
+                    r"bandwidth|metadata|machine learning|infrastructure|geographically|at rest|anonymi[sz]ed|real-time)\b)")
+OK_CAPS = {"OK", "AI", "TV", "PM", "AM", "I", "USA", "UK", "LOL", "OMG"}
+
+
+def jargon(lines: list[dict[str, Any]]) -> list[str]:
+    """Words a teen wouldn't know, unless the same line explains them (a dash, "which means", "like", "basically")."""
+    out = []
+    for L in lines:
+        explained = re.search(r"[—–-] |which means|basically|like a|meaning", L["text"], re.I)
+        for m in JARGON.finditer(L["text"]):
+            w = m.group(0)
+            if w.upper() in OK_CAPS or (w.isupper() and len(w) <= 1) or explained:
+                continue
+            out.append(w)
+    return sorted(set(out))
+
+
 def _prompt(topic: str, facts: list[str], notes: str | None) -> str:
     return f"""Write a 35-50 second Instagram Reel as a dialogue that explains: {topic}
 Researched facts (use ONLY these for claims and numbers):
 {chr(10).join(f"- {f}" for f in facts) or "- (no research available: keep claims general and certainly true)"}
 {f"A reviewer watched the previous version; keep the same topic and idea but fix this: {notes}" if notes else ""}
 The two characters: NOA, a curious teenage guy (the viewer's voice: confused, skeptical, funny), and CLAUDE, a small
-friendly orange AI who explains with a grin and a pointer. 12-18 lines, 80-125 words in total, alternating mostly
+friendly orange AI who explains with a grin and a pointer. 12-18 lines, 90-130 words in total, alternating mostly
 (Claude may have two lines in a row once).
+{EXPLAIN}
 {RULES}
 {BOARD.replace("{icons}", ", ".join(ICONS))}
 For every line also give "emotion": 2-6 ADJECTIVES for how it is said (e.g. "skeptical, quick").
@@ -78,7 +112,7 @@ def _norm(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "", s.lower())
 
 
-def validate(s: Any) -> dict[str, Any]:
+def validate(s: Any, strict: bool = True) -> dict[str, Any]:
     if not isinstance(s, dict) or not isinstance(s.get("lines"), list):
         raise ValueError("no lines")
     lines = []
@@ -92,8 +126,11 @@ def validate(s: Any) -> dict[str, Any]:
     if not 8 <= len(lines) <= 22:
         raise ValueError(f"{len(lines)} lines")
     words = sum(len(L["text"].split()) for L in lines)
-    if not 55 <= words <= 150:
-        raise ValueError(f"{words} words")
+    if not 55 <= words <= 165:
+        raise ValueError(f"{words} words (keep it to 90-130)")
+    bad = jargon(lines)
+    if bad and strict:   # the last try is let through rather than losing the video
+        raise ValueError(f"jargon a 12-year-old won't know, say the everyday thing instead: {', '.join(bad)}")
     stale = [p for p in STALE if p in " ".join(L["text"].lower() for L in lines)]
     if stale:
         raise ValueError(f"reused lines from the sample video: {stale}")
@@ -140,7 +177,9 @@ def write_script(topic: str, notes: str | None = None) -> dict[str, Any]:
     last: Exception | None = None
     for attempt in range(3):
         try:
-            s = validate(gemini_json(_prompt(topic, found["facts"], notes), .85))
+            # a rejected draft's reason goes back to the writer, so the next try fixes it instead of guessing
+            fix = "; ".join(x for x in (notes, f"Your last draft was rejected: {last}" if last else None) if x) or None
+            s = validate(gemini_json(_prompt(topic, found["facts"], fix), .85), strict=attempt < 2)
             return {**s, "sources": found["sources"]}
         except Exception as e:  # noqa: BLE001 — a broken draft gets another try
             last = e
