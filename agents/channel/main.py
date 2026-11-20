@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,7 @@ from lib.supabase_client import log_run, sb
 ENGINE = Path(__file__).parent / "engine"
 PALETTES = ["grouper"]   # PALETTES in engine/world.js; the Grouper look (one indigo family, dark glass) since 12.11
 BUCKET = "channel-videos"
+KEEP_DAYS = 7   # days a video stays in Supabase Storage (free tier = 1GB)
 # The day's videos per channel. Hebrew (one video) goes first so a slow English render can't push it past the job timeout.
 PLAN = [("he", int(os.getenv("CHANNEL_HE", "1"))), ("en", int(os.getenv("CHANNEL_EN", "3")))]
 STARTED = time.monotonic()
@@ -184,7 +186,24 @@ def _today_plan() -> list[tuple[str, int]]:
     return PLAN
 
 
+def prune_storage(days: int = KEEP_DAYS) -> int:
+    """Supabase free tier = 1GB storage; videos are ~10MB each. Files older than `days` leave the bucket (they're already in
+    Telegram and in Inbar's local archive); the row stays, with storage_path cleared, so the dashboard shows "אין קובץ"."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    old = sb().table("channel_videos").select("id").lt("created_at", cutoff).not_.is_("storage_path", "null").execute().data or []
+    for r in old:
+        sb().storage.from_(BUCKET).remove([f"{r['id']}.mp4", f"{r['id']}-edit.mp4", f"{r['id']}-cover.jpg"])
+        sb().table("channel_videos").update({"storage_path": None}).eq("id", r["id"]).execute()
+    return len(old)
+
+
 def run() -> dict[str, Any]:
+    try:
+        pruned = prune_storage()
+        if pruned:
+            print(f"[channel] pruned {pruned} videos older than {KEEP_DAYS} days from storage", file=sys.stderr)
+    except Exception as e:  # noqa: BLE001 — cleanup must never block making videos
+        print(f"[channel] prune failed: {e}", file=sys.stderr)
     rows = sb().table("channel_videos").select("topic,lang").order("created_at").execute().data or []
     made, failed, n = [], [], 0
     plan = _today_plan()
