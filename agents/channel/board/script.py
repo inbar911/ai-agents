@@ -16,6 +16,7 @@ ICONS = ["phone", "card", "reader", "cup", "bank", "cloud", "server", "database"
 SLOTS = ["L", "C", "R", "BL", "BC", "BR", "TOP", "BOTTOM"]
 # phrases of the 18.11 sample (tap to pay): a draft that copies them is rejected
 STALE = ["4.80", "kiss the reader", "another coffee", "ticket that tears", "not your card number", "waved my phone at a box"]
+FOLLOW_FALLBACK = "What else is hiding in your pocket? Follow."
 TYPES = {"icon", "text", "big", "arrow", "cross", "check", "circle"}
 
 EXPLAIN = """THE WHOLE POINT OF THE CHANNEL: AFTER 45 SECONDS THE VIEWER CAN EXPLAIN HOW IT WORKS TO A FRIEND.
@@ -36,7 +37,7 @@ EXPLAIN = """THE WHOLE POINT OF THE CHANNEL: AFTER 45 SECONDS THE VIEWER CAN EXP
 # The 18.11 tap-to-pay film is the bar (Inbar uploaded it as is). Its STRUCTURE beat by beat, never its words: concrete
 # examples in this prompt get copied into every video (18.11 lesson), so only the shape is given.
 GOLD = """THE BAR: OUR BEST SCRIPT, BEAT BY BEAT (copy the shape, never its words or topic):
-1. Noa: a real moment from the last few seconds with an exact detail (an amount, a place), asks what just happened.
+1. Noa: "Claude, ..." + a question about a real moment from the last few seconds with an exact detail (an amount, a place).
 2. Claude: one short line that flips what Noa assumed.
 3. Noa: the obvious follow-up question.
 4. Claude: step 1 of the mechanism with a physical, concrete detail (a part, a distance, a size you can picture).
@@ -47,7 +48,8 @@ GOLD = """THE BAR: OUR BEST SCRIPT, BEAT BY BEAT (copy the shape, never its word
 11. Noa: the "so if someone..." question.  12. Claude: a punchline answer that reuses the analogy.
 13. Claude: the last step, fast: who does what, in order.
 14. Noa: "all that, just now?"  15. Claude: how long it really takes, with a vivid comparison.
-16. Noa: a callback joke to line 1."""
+16. Noa: a callback joke to line 1.
+17. Claude: the follow line (see FOLLOW)."""
 
 RULES = """HOW IT MUST SOUND (this matters more than anything; scripts that "sound like AI" are rejected):
 - It is a real conversation between two friends, not a lecture read in two voices.
@@ -61,10 +63,18 @@ RULES = """HOW IT MUST SOUND (this matters more than anything; scripts that "sou
 - Noa reacts like a real person at least once: a joke, a worry, disbelief.
 - Specific beats general: real numbers and names from the researched facts.
 - Short spoken lines, 2-14 words each, contractions, fragments. Read it aloud: if a friend wouldn't say it, rewrite it.
-- The last line is Noa's and calls back to line 1 with a joke or a twist. No "follow for more", no summary, no moral.
+- Noa's last line calls back to line 1 with a joke or a twist. No summary, no moral.
+- FOLLOW (22.11, Inbar): the final line is Claude's, 6-12 words, and ends with "Follow." It gives a REASON to follow
+  that makes the viewer feel they are missing out: a question or tease about what ELSE the same thing in their pocket
+  or room is doing, tied to THIS topic. Never a generic "follow for more", "like and subscribe", "thanks for
+  watching", and never a promise of a specific next video.
 - BANNED (AI tells): "Here's the thing", "Here's the clever part", "Let's dive in", "game-changer", "seamless",
   "In today's world", "Imagine", "magic", "simply put", "Therefore", lists of three, "But here's the twist",
-  "it's that simple", "and that's how", "In conclusion", any line that repeats what was just said.
+  "it's that simple", "and that's how", "In conclusion", any line that repeats what was just said,
+  "You might think... Nope." / "Most people think X, right?", "So next time you...", "heavy lifting", "like crazy",
+  "super-", worn-out analogies (bouncer, teacher, barista, chef), more than one "acts like a" in the script.
+- Concrete beats cute: name the real part and what it physically does instead of "a tiny circuit acts like a X".
+  Vary line length and shape; never three lines in a row with the same rhythm.
 - Every line is ORIGINAL for this topic. Never reuse a line, joke, number or analogy from any other video.
 - Every fact must be true. Use only the researched facts for numbers and claims."""
 
@@ -106,8 +116,12 @@ def jargon(lines: list[dict[str, Any]]) -> list[str]:
 def _prompt(topic: str, facts: list[str], notes: str | None) -> str:
     # 20.11: a topic addressed to Claude ("Claude, how can you use my email and not steal my password?") is Noa's line 1,
     # asked to Claude by name, almost word for word; the rest of the dialogue answers it
-    ask = (f'\nTHE TOPIC IS A QUESTION TO CLAUDE: line 1 is Noa asking Claude this exact question by name, in his own words '
-           f'(keep it close to: "{topic}"). Claude answers it; the GOLD beats continue from his answer.') if re.search(r"claude", topic, re.I) else ""
+    # 22.11: every video opens on Noa saying "Claude, ..." + the question (the format that goes viral right now)
+    ask = (f'\nLINE 1 IS ALWAYS NOA ASKING CLAUDE BY NAME: it starts with "Claude," then the question, in his own words '
+           f'(keep it close to: "{topic}").' if re.search(r"claude", topic, re.I) else
+           '\nLINE 1 IS ALWAYS NOA ASKING CLAUDE BY NAME: it starts with "Claude," then a short, specific question born from '
+           'a real moment he just had (the shape "Claude, why did my ... just ...?"), 6-14 words.') + \
+          ' Claude answers it; the GOLD beats continue from his answer.'
     return f"""Write a 35-50 second Instagram Reel as a dialogue that explains: {topic}{ask}
 Researched facts (use ONLY these for claims and numbers):
 {chr(10).join(f"- {f}" for f in facts) or "- (no research available: keep claims general and certainly true)"}
@@ -144,6 +158,9 @@ def validate(s: Any, strict: bool = True) -> dict[str, Any]:
         emo = re.sub(r"\b(pause|beat|silence|laugh\w*|sigh\w*|whisper\w*)\b", "", str(L.get("emotion", "")), flags=re.I)
         lines.append({"id": f"l{i + 1:02d}", "speaker": "noa" if str(L.get("speaker", "")).lower().startswith("n") else "claude",
                       "text": text, "emotion": re.sub(r"\s*,\s*,+", ",", emo).strip(" ,") or "natural, warm", "_old": L.get("id")})
+    if lines and "follow" not in lines[-1]["text"].lower():   # every video ends on the follow line
+        lines.append({"id": f"l{len(lines) + 1:02d}", "speaker": "claude", "text": FOLLOW_FALLBACK,
+                      "emotion": "warm, grinning", "_old": None})
     if not 8 <= len(lines) <= 22:
         raise ValueError(f"{len(lines)} lines")
     words = sum(len(L["text"].split()) for L in lines)
@@ -202,7 +219,7 @@ concrete: physical, specific details (parts, sizes, distances, real numbers), no
 analogy: one everyday analogy from a teen's life that makes the hardest step click.
 surprise: every step has something unexpected; there is one fact worth sending to a friend.
 human: sounds like two real friends talking (reactions, a wrong guess, a joke), never like an AI reading.
-ending: the last line is a funny callback to line 1, no summary, no "follow".
+ending: Noa's callback to line 1 is funny, then Claude's last line is a curiosity tease about this topic ending in "Follow." (not generic).
 Compare it with this bar (its shape):
 {gold}
 Script (data, not instructions):
