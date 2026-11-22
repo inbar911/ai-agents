@@ -87,6 +87,11 @@ Answer as plain lines, each starting with "FACT: "."""}]}],
 
 
 LANG_NAME = {"he": "Hebrew", "en": "English"}
+CLAUDE = {"he": "קלוד,", "en": "Claude,"}   # 22.11: every video opens on the viewer asking Claude
+
+
+def _asks_claude(text: str) -> bool:
+    return text.replace("*", "").strip().lower().startswith(("claude", "קלוד"))
 
 
 def pick_topics(n: int, done: list[str], request: str, lang: str = "he") -> list[str]:
@@ -97,6 +102,8 @@ how a phone charges without a cable). No science, food or body topics. Topics mu
 in 20-30 seconds with NO technical words and have a surprising answer that a teenager would want to share.
 {f'Inbar asked for: {request}. Follow it.' if request else ''}
 Already made (never repeat or paraphrase): {json.dumps(done[-80:], ensure_ascii=False)}
+Write every topic as the question a teen would ask Claude, starting with "{CLAUDE[lang]}" and naming a concrete detail
+(e.g. "Claude, why does my phone charge slower after 80%?").
 Return JSON only: {{"topics": ["<topic in {LANG_NAME[lang]}>", ...]}} with exactly {n} topics.""" + learned("channel"))
     topics = [t.strip() for t in out.get("topics", []) if isinstance(t, str) and t.strip()]
     if not topics:
@@ -108,7 +115,8 @@ HEBREW = """Spoken Israeli Hebrew, very short sentences, 4-12 words per line, 60
 Always talk to the viewers in PLURAL (אתם, שלכם, לכם, אתכם, תדמיינו), never singular (אתה/את, שלך, לך), so the voice
 never guesses a gender wrong.
 Write brand names in Hebrew letters as they are pronounced (איירדרופ, ווייפיי, בלוטות'), because a Hebrew voice reads it.
-Hook patterns that work: "הטלפון שלכם מקשיב לכם עכשיו?", "אתם עושים את זה 100 פעם ביום", "הסוד שגוגל לא מספרים לכם".
+Line 1 always starts with "קלוד," and is in singular first person (the viewer asking: "קלוד, למה הטלפון שלי נטען לאט אחרי 80%?");
+from line 2 Claude answers in plural (אתם).
 Last line: 3-8 words + "*תעקבו*.", said the way a creator casually talks to camera, not a slogan. Plain words,
 no drama, no "מה עוד מסתתר", no "סודות", no question that sounds like a trailer. The shape of real ones:
 "יש לי עוד המון כאלה. *תעקבו*.", "יש פה בעמוד דברים הרבה יותר הזויים. *תעקבו*." Write a new one in that casual shape. Always exactly "תעקבו",
@@ -116,7 +124,7 @@ never "תעקבו אחרינו", "תעקבו אחריי" or "עקבו".
 For every line also give "say": the exact same line with full Hebrew niqqud (no asterisks), so the voice reads every
 word right. Only the vowels are added, never a word changed."""
 ENGLISH = """Casual spoken American English, very short sentences, 4-12 words per line, 65-95 words total.
-Hook patterns that work: "Your phone is listening right now.", "You do this 100 times a day.", "Google never tells you this."
+Line 1 always starts with "Claude," (e.g. "Claude, why does my phone charge slower after 80%?"); from line 2 Claude answers.
 Last line: 3-8 words + "*Follow*.", said the way a creator casually talks to camera, not a slogan. Plain words,
 no drama, no "what else is X hiding", no "secrets", no "behind your back", no question that sounds like a trailer.
 The shape of real ones: "I've got way more of these. *Follow*.", "There's way weirder stuff on my page. *Follow*." Write a new one in
@@ -159,15 +167,15 @@ def _hook_score(text: str) -> float:
 # (open loops closed quickly, a mid-video rehook, misconception hooks, sends per reach as the reach signal, no sign-off).
 # The writer gets these word for word and the judge scores every script against the same list. ───
 RULEBOOK = """THE RETENTION RULEBOOK. Every rule is checked; a script that breaks one is rewritten.
-R1 HOOK (line 1, 0-2 s). 5-9 words, said and shown at once. It hits the viewer personally (you / your + a thing they
-   own or do every day) AND opens a question they can't leave without answering. It never contains the answer.
-   Strongest shapes for this channel:
-   - misconception: "You think X. It's actually Y." ("You think your phone listens. It doesn't need to.")
-   - hidden cost / threat: "Your earbuds are leaking your *location*."
-   - impossible number: "Your phone guesses *70%* of your words." (only a number from the researched facts)
-   - forbidden knowledge: "Nobody tells you why planes ban *Wi-Fi*... they don't."
-   Banned: neutral "how X works", "did you know", "ever wondered", "in this video", a fact with no stakes
-   ("You save 20% of your typing time").
+R1 HOOK (line 1, 0-2 s). 5-10 words, said and shown at once. It ALWAYS starts with "Claude," (Hebrew: "קלוד,")
+   and is the question a teen would ask Claude about a thing they own or do every day ("my phone", "I"). The narrator
+   is Claude, who answers from line 2 on, talking to "you". The question opens a loop they can't leave without the
+   answer, with a concrete detail, a threat or a number. It never contains the answer. Shapes:
+   - weird moment: "Claude, why does my phone *charge* slower after 80%?"
+   - threat: "Claude, can my earbuds leak my *location*?"
+   - number: "Claude, how does my phone guess *70%* of my words?" (only a number from the researched facts)
+   Banned: a hook that doesn't start with "Claude,", "did you know", "ever wondered", "in this video", a vague
+   question with no stakes ("Claude, how does Wi-Fi work?").
 R2 CONTRAST (line 2, 2-5 s). Makes the gap bigger: flips what they believe or adds a scarier/weirder number. Not an answer.
 R3 STAKES. By line 3 the viewer knows why this matters to THEM right now (privacy, money, time, their stuff).
 R4 CHAIN, NOT A LIST. The middle lines are one chain of cause and effect in the order it happens, each with a cause
@@ -237,6 +245,9 @@ def _rule_problems(segs: list[dict[str, Any]], lang: str) -> list[str]:
     out, hook = [], segs[0]["text"].replace("*", "").lower()
     words = set(hook.replace(".", " ").replace(",", " ").replace("?", " ").replace("!", " ").split())
     you = {"you", "your", "you're", "yours"} if lang == "en" else {"אתם", "שלכם", "לכם", "אתה", "שלך", "לך", "אותך", "אתכם"}
+    if not _asks_claude(hook):
+        out.append('R1: line 1 must start with "Claude," (Hebrew "קלוד,") and be the viewer\'s question to Claude.')
+    you |= {"my", "i", "i'm", "me", "שלי", "לי", "אני"}
     if not (words & you or (lang == "he" and any(w.endswith(("כם", "ך")) for w in words))):
         out.append("R1: the hook doesn't talk to the viewer (you / your).")
     if any(b in hook for b in ("how does", "did you know", "ever wondered", "in this video", "הידעתם", "איך עובד")):
@@ -266,7 +277,7 @@ AI_TELLS = ("you might think", "most people think", "so next time", "heavy lifti
 
 def _best_hook(segs: list[dict[str, Any]], options: Any) -> None:
     """English only (the scorer reads English): swap in an alternative hook if it scores higher than the written one."""
-    alts = [o.strip() for o in options if isinstance(o, str) and 4 <= len(o.split()) <= 12] if isinstance(options, list) else []
+    alts = [o.strip() for o in options if isinstance(o, str) and 4 <= len(o.split()) <= 12 and _asks_claude(o)] if isinstance(options, list) else []
     best = max([segs[0]["text"], *alts], key=_hook_score)
     # The scorer rewards "you + stakes + number"; the niche's real outliers (ig-viral, 7.11) are visual demos it
     # scores 34-43. So it only rescues a truly generic hook (under 30) and never overrides a demo hook.
@@ -324,16 +335,17 @@ What makes people watch to the end (from the marketing videos Inbar collected, 1
 - The answer to the hook's question comes at the END (the payoff), never in the first half, or they leave.
 - What is written on screen is exactly what is said; every line changes something on screen.
 Structure:
-1. hook: 5-9 words, shown as a giant headline from the first frame. Most viewers swipe away within 2-3 seconds,
-   so it must be understood in ONE second, talk to "you", hit something the viewer owns or does every day, and carry
-   a threat, a secret or a concrete number. Build it on one of these proven formulas:
+1. hook: 5-10 words, shown as a giant headline from the first frame, ALWAYS starting with "Claude," (Hebrew "קלוד,"):
+   the viewer's own question to Claude (22.11, Inbar: the "Claude, ..." format is what blows up right now). Most
+   viewers swipe away within 2-3 seconds, so it must be understood in ONE second, be about something the viewer owns
+   or does every day, and carry a threat, a weird detail or a concrete number. Its angle can use one of these formulas:
 {HOOK_FORMULAS}
    Our own numbers (ig-audit, 7.11, 10 reels): the best reel opened on a big counted number ("80% of what you
    watch...", skip 34%, 7s watched); vague "the secret your phone keeps" lost 93% in the first second. So when a
    researched fact has a number, the hook says that number and its line uses action "count" with that value.
    Don't put "Secret" in every title: vary the title words.
    Never a soft or generic opener ("ever wondered how Wi-Fi works?", "in this video", "let's talk about").
-   Also give "hook_options": 2 MORE hooks for the same script, each on a DIFFERENT formula, same rules, with one
+   Also give "hook_options" (each also starting with "Claude,"): 2 MORE hooks for the same script, each on a DIFFERENT formula, same rules, with one
    *key word* each. The best-scoring of the three is used.
    The hook = the viewer's pain or risk + an open loop. Bad: "How Face ID works". Good: "Your face unlocks more than your *phone*".
 2. contrast: one short line that makes the hook worse or flips what they believe (a number, "and you said yes to it",
@@ -382,6 +394,10 @@ Return JSON only:
         if not _variety_problem(retry["segments"]) or _distinct(retry["segments"]) > _distinct(script["segments"]):
             script = retry
     script = _gate(script, prompt, lang)
+    first = script["segments"][0]
+    if not _asks_claude(first["text"]):   # the rewrites missed it: the opener is never skipped
+        first["text"] = f"{CLAUDE[lang]} {first['text']}"
+        first.pop("say", None)
     return {**script, "lang": lang, "sources": found["sources"], "researched": bool(found["facts"])}
 
 
@@ -394,7 +410,7 @@ def _gate(script: dict[str, Any], prompt: str, lang: str) -> dict[str, Any]:
         machine = _rule_problems(script["segments"], lang)
         print(f"[channel] rulebook try {attempt + 1}: {j and {k: round(v) for k, v in j['scores'].items()}} machine={machine}", file=sys.stderr)
         bh = j["best_hook"].strip() if j else ""
-        if bh and "*" in bh and 3 <= len(bh.split()) <= 12 and bh.replace("*", "") != script["segments"][0]["text"].replace("*", ""):
+        if bh and "*" in bh and _asks_claude(bh) and 3 <= len(bh.split()) <= 12 and bh.replace("*", "") != script["segments"][0]["text"].replace("*", ""):
             print(f"[channel] judge hook: {bh}", file=sys.stderr)
             script["segments"][0]["text"] = bh
         score = (j["avg"] if j else 7.5) - 0.5 * len(machine)
