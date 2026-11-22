@@ -109,15 +109,18 @@ Always talk to the viewers in PLURAL (אתם, שלכם, לכם, אתכם, תדמ
 never guesses a gender wrong.
 Write brand names in Hebrew letters as they are pronounced (איירדרופ, ווייפיי, בלוטות'), because a Hebrew voice reads it.
 Hook patterns that work: "הטלפון שלכם מקשיב לכם עכשיו?", "אתם עושים את זה 100 פעם ביום", "הסוד שגוגל לא מספרים לכם".
-Last line: a short question that teases what ELSE the same thing they own is doing, tied to this topic, + the single
-word "*תעקבו*." (e.g. "ומה עוד הטלפון שלכם עושה בלי לספר? *תעקבו*."). Always exactly "תעקבו",
+Last line: 3-8 words + "*תעקבו*.", said the way a creator casually talks to camera, not a slogan. Plain words,
+no drama, no "מה עוד מסתתר", no "סודות", no question that sounds like a trailer. The shape of real ones:
+"יש לי עוד המון כאלה. *תעקבו*.", "יש פה בעמוד דברים הרבה יותר הזויים. *תעקבו*." Write a new one in that casual shape. Always exactly "תעקבו",
 never "תעקבו אחרינו", "תעקבו אחריי" or "עקבו".
 For every line also give "say": the exact same line with full Hebrew niqqud (no asterisks), so the voice reads every
 word right. Only the vowels are added, never a word changed."""
 ENGLISH = """Casual spoken American English, very short sentences, 4-12 words per line, 65-95 words total.
 Hook patterns that work: "Your phone is listening right now.", "You do this 100 times a day.", "Google never tells you this."
-Last line: a short question that teases what ELSE the same thing they own is doing, tied to this topic, + the single
-word "*Follow*." (e.g. "What else is your phone doing behind your back? *Follow*."). Never generic "want more?"."""
+Last line: 3-8 words + "*Follow*.", said the way a creator casually talks to camera, not a slogan. Plain words,
+no drama, no "what else is X hiding", no "secrets", no "behind your back", no question that sounds like a trailer.
+The shape of real ones: "I've got way more of these. *Follow*.", "There's way weirder stuff on my page. *Follow*." Write a new one in
+that casual shape for this video."""
 
 
 SAY = ' "say": "<the same line with full niqqud>",'
@@ -439,18 +442,19 @@ def _gaming(seg: dict[str, Any], text: str) -> None:
 
 NOISE = {"eye", "gear", "heart", "pulse"}   # symbols the writer used as decoration, unrelated to the line
 
-FOLLOW = {"he": ("*תעקבו*.", "ומה עוד מסתתר אצלכם בכיס? *תעקבו*.", ("תעקבו", "עקבו")),
-          "en": ("*Follow*.", "What else is hiding in your pocket? *Follow*.", ("follow",))}
+FOLLOW = {"he": ("*תעקבו*.", "יש לי עוד המון כאלה. *תעקבו*.", ("תעקבו", "עקבו")),
+          "en": ("*Follow*.", "I've got way more of these. *Follow*.", ("follow",))}
 
 
 def _follow_line(text: str, lang: str = "he") -> str:
-    """Every video ends the same way: a short question, then exactly the one word (Hebrew: "תעקבו", never "אחרינו")."""
+    """Every video ends the same way: a short casual lead, then exactly the one word (Hebrew: "תעקבו", never "אחרינו")."""
     word, fallback, stems = FOLLOW[lang]
-    i = text.find("?")
-    question = text[: i + 1].strip() if i > 0 else ""
-    if not any(st in text.lower() for st in stems) or not question or any(st in question.lower() for st in stems):
+    low = text.lower()
+    i = min((low.find(st) for st in stems if st in low), default=-1)
+    lead = text[:i].replace("*", "").strip(" ,-") if i > 0 else ""
+    if not lead or not 2 <= len(lead.split()) <= 10:
         return fallback
-    return f"{question} {word}"
+    return f"{lead if lead[-1] in '.?!' else lead + '.'} {word}"
 
 
 def _bare(t: str) -> str:
