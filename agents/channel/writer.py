@@ -386,7 +386,11 @@ Return JSON only:
                  "focus": "<object (or a symbol when no object fits)>", "symbol": "<symbol shown over it, optional>", "action": "<action>", "target": "<object, only for beam>",
                  "label": "<optional 1-2 words floating over it>", "value": <number, only for count>,
                  "suffix": "<only for count>"}}]}}"""
-    script = _valid_script(_gemini(prompt), lang)
+    try:
+        script = _valid_script(_gemini(prompt), lang)
+    except RuntimeError as e:   # 22.11: one bad draft (13 lines) used to drop the whole video
+        print(f"[channel] draft rejected ({e}); retrying", file=sys.stderr)
+        script = _valid_script(_gemini(prompt + f"\n\nYour last draft was rejected: {e}. Write 8-10 lines."), lang)
     problem = _variety_problem(script["segments"])
     if problem:   # one rewrite: a video stuck on one model looks empty (Inbar on #43: a soda can on 8 of 11 lines)
         print(f"[channel] variety: {problem}; rewriting", file=sys.stderr)

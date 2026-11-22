@@ -110,11 +110,16 @@ def mix(work: Path, dur: float, ev: list[dict[str, Any]]) -> Path:
     vo = np.zeros(n, np.float32)
     starts = json.loads((work / "voices" / "vo.json").read_text())
     for lid, t in starts.items():
+        if t is None or not np.isfinite(t):
+            continue
         x = _read(work / "voices" / f"{lid}.wav"); i = int(t * SR)
         vo[i:i + len(x)] += x[: max(0, n - i)]
     fol = np.zeros(n, np.float32)
     for e in ev:
-        i = int(float(e.get("t", 0)) * SR)
+        t, d0 = float(e.get("t") or 0), float(e.get("dur") or .1)
+        if not (np.isfinite(t) and np.isfinite(d0)):   # 22.11: one NaN-timed stroke crashed a finished video
+            continue
+        i = int(t * SR)
         if i >= n:
             continue
         ty = e.get("type")
