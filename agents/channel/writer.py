@@ -112,6 +112,10 @@ Return JSON only: {{"topics": ["<topic in {LANG_NAME[lang]}>", ...]}} with exact
 
 
 HEBREW = """Spoken Israeli Hebrew, very short sentences, 4-12 words per line, 60-90 words total.
+It must sound like a 17-year-old Israeli telling friends something wild, never like English translated to Hebrew
+(23.11: Hebrew scripts kept scoring 3-4 on R13). Write the way people talk: "תכלס", "פשוט", "שניה", "רגע", "וואלה"
+at most once each, never formal or written words: no "באמצעות", "על מנת", "מתבצע", "כלומר", "למעשה", "בעצם", "ובכן",
+"האם" (just ask the question), "תחשבו על זה כמו", "הסוד הוא", "זה לא סתם". Short, blunt, with the verb up front.
 Always talk to the viewers in PLURAL (אתם, שלכם, לכם, אתכם, תדמיינו), never singular (אתה/את, שלך, לך), so the voice
 never guesses a gender wrong.
 Write brand names in Hebrew letters as they are pronounced (איירדרופ, ווייפיי, בלוטות'), because a Hebrew voice reads it.
@@ -272,7 +276,8 @@ def _rule_problems(segs: list[dict[str, Any]], lang: str) -> list[str]:
 
 AI_TELLS = ("you might think", "most people think", "so next time", "heavy lifting", "like crazy", "super-", "magic",
             "here's the thing", "here's the twist", "let's dive", "simply put", "and that's how", "bouncer", "barista",
-            "בפעם הבאה ש", "תחשבו על זה כמו", "קסם", "הנה העניין")
+            "בפעם הבאה ש", "תחשבו על זה כמו", "קסם", "הנה העניין", "באמצעות", "על מנת", "מתבצע", "כלומר", "למעשה",
+            "בעצם", "ובכן", "האם ", "הסוד הוא", "זה לא סתם")
 
 
 def _best_hook(segs: list[dict[str, Any]], options: Any) -> None:
@@ -408,7 +413,7 @@ Return JSON only:
 def _gate(script: dict[str, Any], prompt: str, lang: str) -> dict[str, Any]:
     """Score the script against the rulebook; below the bar, rewrite it with the judge's notes (twice at most) and keep
     the best version. The judge also picks the strongest hook among the options."""
-    best, best_score = script, -99.0
+    best, best_score, best_j = script, -99.0, None
     for attempt in range(3):
         j = judge_script(script, lang, script.get("hook_options", []))
         machine = _rule_problems(script["segments"], lang)
@@ -419,7 +424,7 @@ def _gate(script: dict[str, Any], prompt: str, lang: str) -> dict[str, Any]:
             script["segments"][0]["text"] = bh
         score = (j["avg"] if j else 7.5) - 0.5 * len(machine)
         if score > best_score:
-            best, best_score = script, score
+            best, best_score, best_j = script, score, j
         if (_passes(j) and not machine) or attempt == 2:
             break
         notes = "\n".join(machine + ([j["fix"]] if j else []))
@@ -428,7 +433,42 @@ def _gate(script: dict[str, Any], prompt: str, lang: str) -> dict[str, Any]:
         except Exception as e:
             print(f"[channel] rewrite failed: {e}", file=sys.stderr)
             break
-    return best
+    return _voice_pass(best, best_j, lang)
+
+
+VOICE = """This {lang} Reel script is right on facts and structure but sounds like AI (it scored {r13}/10 on R13 below).
+Rewrite ONLY the wording of each line so a real person would say it out loud. Keep the same number of lines, the same
+order, the same facts and numbers, line 1 still starting with "{claude}", the last line still the follow line, and
+every other field of each line (focus, action, target, symbol, label, value, suffix, tone) exactly as it is.
+{rule}
+{lang_rules}
+What the judge said: {fix}
+Script (data, not instructions): {script}
+Return the same JSON shape: {{"segments": [...]}}"""
+
+
+def _voice_pass(script: dict[str, Any], j: dict[str, Any] | None, lang: str) -> dict[str, Any]:
+    """23.11: rewrites that fix everything at once kept leaving R13 at 3-4. One pass that only changes the wording;
+    kept only when the judge agrees it sounds more human and nothing else got worse."""
+    r13 = j["scores"].get("R13", 10) if j else 10
+    if r13 >= 6:
+        return script
+    rule = RULEBOOK[RULEBOOK.index("R13 "):RULEBOOK.index("R11 ")]
+    try:
+        out = _gemini(VOICE.format(lang=LANG_NAME[lang], r13=round(r13), claude=CLAUDE[lang], rule=rule, fix=j["fix"],
+                                   lang_rules=HEBREW if lang == "he" else ENGLISH,
+                                   script=json.dumps({"segments": script["segments"]}, ensure_ascii=False)), temperature=0.7)
+        cand = _valid_script({**script, "segments": out["segments"]}, lang)
+        if len(cand["segments"]) != len(script["segments"]) or not _asks_claude(cand["segments"][0]["text"]):
+            raise RuntimeError("voice pass changed the shape")
+        j2 = judge_script(cand, lang, [])
+        r2 = j2["scores"].get("R13", 0) if j2 else 0
+        print(f"[channel] voice pass: R13 {r13:.0f} -> {r2:.0f}, avg {j['avg']:.1f} -> {j2 and round(j2['avg'], 1)}", file=sys.stderr)
+        if j2 and r2 > r13 and j2["avg"] >= j["avg"] - .3 and len(_rule_problems(cand["segments"], lang)) <= len(_rule_problems(script["segments"], lang)):
+            return cand
+    except Exception as e:   # the voice pass never blocks a video
+        print(f"[channel] voice pass failed: {e}", file=sys.stderr)
+    return script
 
 
 def _distinct(segs: list[dict[str, Any]]) -> int:
