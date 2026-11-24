@@ -12,6 +12,7 @@ import json
 import os
 import re
 import sys
+import time
 
 import httpx
 
@@ -97,10 +98,18 @@ def _send_file(method: str, field: str, path: "os.PathLike[str]", name: str, mim
     if not token:
         raise RuntimeError("missing bot secret: telegram_token")
     dest = {k: str(v) for k, v in _destination(bot).items()}
-    with open(path, "rb") as f, httpx.Client(timeout=300) as client:
-        res = client.post(f"https://api.telegram.org/bot{token}/{method}",
-                          data={**dest, "caption": caption[:1000], **(extra or {})}, files={field: (name, f, mime)})
-        _check(res)
+    # Big uploads from GitHub runners sometimes get "Connection reset by peer" (24.11: 2 of 4 reels lost their Telegram post).
+    for attempt in range(4):
+        try:
+            with open(path, "rb") as f, httpx.Client(timeout=300) as client:
+                res = client.post(f"https://api.telegram.org/bot{token}/{method}",
+                                  data={**dest, "caption": caption[:1000], **(extra or {})}, files={field: (name, f, mime)})
+            _check(res)
+            return
+        except (httpx.TransportError, ConnectionError) as e:
+            if attempt == 3:
+                raise RuntimeError(f"telegram upload failed after 4 tries: {type(e).__name__}") from None
+            time.sleep(10 * (attempt + 1))
 
 
 def send_video(path: "os.PathLike[str]", caption: str, bot: str = "jarvis", agent: str | None = None) -> None:

@@ -87,11 +87,24 @@ Answer as plain lines, each starting with "FACT: "."""}]}],
 
 
 LANG_NAME = {"he": "Hebrew", "en": "English"}
-CLAUDE = {"he": "קלוד,", "en": "Claude,"}   # 22.11: every video opens on the viewer asking Claude
+# 22.11: English videos open on the viewer asking Claude. 24.11, Inbar: Hebrew never says "קלוד" at all.
+CLAUDE = "Claude,"
 
 
 def _asks_claude(text: str) -> bool:
-    return text.replace("*", "").strip().lower().startswith(("claude", "קלוד"))
+    return text.replace("*", "").strip().lower().startswith("claude")
+
+
+def _opener_ok(text: str, lang: str) -> bool:
+    return _asks_claude(text) if lang == "en" else not re.search(r"קלוד|claude", text, re.I)
+
+
+TOPIC_SHAPE = {
+    "en": 'Write every topic as the question a teen would ask Claude, starting with "Claude," and naming a concrete detail\n'
+          '(e.g. "Claude, why does my phone charge slower after 80%?").',
+    "he": 'Write every topic as a plain question in Hebrew naming a concrete detail (e.g. "למה הטלפון נטען לאט אחרי 80%?"). '
+          'Never mention Claude or "קלוד".',
+}
 
 
 def pick_topics(n: int, done: list[str], request: str, lang: str = "he") -> list[str]:
@@ -102,8 +115,7 @@ how a phone charges without a cable). No science, food or body topics. Topics mu
 in 20-30 seconds with NO technical words and have a surprising answer that a teenager would want to share.
 {f'Inbar asked for: {request}. Follow it.' if request else ''}
 Already made (never repeat or paraphrase): {json.dumps(done[-80:], ensure_ascii=False)}
-Write every topic as the question a teen would ask Claude, starting with "{CLAUDE[lang]}" and naming a concrete detail
-(e.g. "Claude, why does my phone charge slower after 80%?").
+{TOPIC_SHAPE[lang]}
 Return JSON only: {{"topics": ["<topic in {LANG_NAME[lang]}>", ...]}} with exactly {n} topics.""" + learned("channel"))
     topics = [t.strip() for t in out.get("topics", []) if isinstance(t, str) and t.strip()]
     if not topics:
@@ -119,8 +131,8 @@ at most once each, never formal or written words: no "באמצעות", "על מ�
 Always talk to the viewers in PLURAL (אתם, שלכם, לכם, אתכם, תדמיינו), never singular (אתה/את, שלך, לך), so the voice
 never guesses a gender wrong.
 Write brand names in Hebrew letters as they are pronounced (איירדרופ, ווייפיי, בלוטות'), because a Hebrew voice reads it.
-Line 1 always starts with "קלוד," and is in singular first person (the viewer asking: "קלוד, למה הטלפון שלי נטען לאט אחרי 80%?");
-from line 2 Claude answers in plural (אתם).
+Hook patterns that work: "הטלפון שלכם מקשיב לכם עכשיו?", "אתם עושים את זה 100 פעם ביום", "למה הטלפון שלכם נטען לאט אחרי 80%?".
+Never write "קלוד" or "Claude" anywhere: the narrator talks straight to the viewers.
 Last line: 3-8 words + "*תעקבו*.", said the way a creator casually talks to camera, not a slogan. Plain words,
 no drama, no "מה עוד מסתתר", no "סודות", no question that sounds like a trailer. The shape of real ones:
 "יש לי עוד המון כאלה. *תעקבו*.", "יש פה בעמוד דברים הרבה יותר הזויים. *תעקבו*." Write a new one in that casual shape. Always exactly "תעקבו",
@@ -171,14 +183,16 @@ def _hook_score(text: str) -> float:
 # (open loops closed quickly, a mid-video rehook, misconception hooks, sends per reach as the reach signal, no sign-off).
 # The writer gets these word for word and the judge scores every script against the same list. ───
 RULEBOOK = """THE RETENTION RULEBOOK. Every rule is checked; a script that breaks one is rewritten.
-R1 HOOK (line 1, 0-2 s). 5-10 words, said and shown at once. It ALWAYS starts with "Claude," (Hebrew: "קלוד,")
-   and is the question a teen would ask Claude about a thing they own or do every day ("my phone", "I"). The narrator
+R1 HOOK (line 1, 0-2 s). 5-10 words, said and shown at once.
+   HEBREW: never mentions Claude/"קלוד"; it talks straight to the viewer (אתם/שלכם) about a thing they own or do every
+   day, with a concrete detail, a threat or a number, and opens a loop. Judge Hebrew hooks by that, not by the shapes below.
+   ENGLISH: it ALWAYS starts with "Claude," and is the question a teen would ask Claude about a thing they own or do every day ("my phone", "I"). The narrator
    is Claude, who answers from line 2 on, talking to "you". The question opens a loop they can't leave without the
    answer, with a concrete detail, a threat or a number. It never contains the answer. Shapes:
    - weird moment: "Claude, why does my phone *charge* slower after 80%?"
    - threat: "Claude, can my earbuds leak my *location*?"
    - number: "Claude, how does my phone guess *70%* of my words?" (only a number from the researched facts)
-   Banned: a hook that doesn't start with "Claude,", "did you know", "ever wondered", "in this video", a vague
+   Banned: an English hook that doesn't start with "Claude,", "did you know", "ever wondered", "in this video", a vague
    question with no stakes ("Claude, how does Wi-Fi work?").
 R2 CONTRAST (line 2, 2-5 s). Makes the gap bigger: flips what they believe or adds a scarier/weirder number. Not an answer.
 R3 STAKES. By line 3 the viewer knows why this matters to THEM right now (privacy, money, time, their stuff).
@@ -249,8 +263,9 @@ def _rule_problems(segs: list[dict[str, Any]], lang: str) -> list[str]:
     out, hook = [], segs[0]["text"].replace("*", "").lower()
     words = set(hook.replace(".", " ").replace(",", " ").replace("?", " ").replace("!", " ").split())
     you = {"you", "your", "you're", "yours"} if lang == "en" else {"אתם", "שלכם", "לכם", "אתה", "שלך", "לך", "אותך", "אתכם"}
-    if not _asks_claude(hook):
-        out.append('R1: line 1 must start with "Claude," (Hebrew "קלוד,") and be the viewer\'s question to Claude.')
+    if not _opener_ok(hook, lang):
+        out.append('R1: line 1 must start with "Claude," and be the viewer\'s question to Claude.' if lang == "en"
+                   else 'R1: never mention Claude or "קלוד" in Hebrew; talk straight to the viewers.')
     you |= {"my", "i", "i'm", "me", "שלי", "לי", "אני"}
     if not (words & you or (lang == "he" and any(w.endswith(("כם", "ך")) for w in words))):
         out.append("R1: the hook doesn't talk to the viewer (you / your).")
@@ -282,7 +297,7 @@ AI_TELLS = ("you might think", "most people think", "so next time", "heavy lifti
 
 def _best_hook(segs: list[dict[str, Any]], options: Any) -> None:
     """English only (the scorer reads English): swap in an alternative hook if it scores higher than the written one."""
-    alts = [o.strip() for o in options if isinstance(o, str) and 4 <= len(o.split()) <= 12 and _asks_claude(o)] if isinstance(options, list) else []
+    alts = [o.strip() for o in options if isinstance(o, str) and 4 <= len(o.split()) <= 12 and _opener_ok(o, "en")] if isinstance(options, list) else []
     best = max([segs[0]["text"], *alts], key=_hook_score)
     # The scorer rewards "you + stakes + number"; the niche's real outliers (ig-viral, 7.11) are visual demos it
     # scores 34-43. So it only rescues a truly generic hook (under 30) and never overrides a demo hook.
@@ -295,6 +310,13 @@ def _best_hook(segs: list[dict[str, Any]], options: Any) -> None:
             words[k] = f"*{words[k].strip('.,?!')}*" + words[k][len(words[k].rstrip('.,?!')):]
             best = " ".join(words)
         segs[0]["text"] = best
+
+
+HOOK_OPENER = {
+    "en": 'ALWAYS starting with "Claude,": the viewer\'s own question to Claude (22.11, Inbar: the "Claude, ..." format '
+          'is what blows up right now).',
+    "he": 'Never mentions Claude or "קלוד": it talks straight to the viewers (אתם/שלכם).',
+}
 
 
 def write_script(topic: str, lang: str = "he", hooks: list[str] | None = None, notes: str | None = None) -> dict[str, Any]:
@@ -340,8 +362,7 @@ What makes people watch to the end (from the marketing videos Inbar collected, 1
 - The answer to the hook's question comes at the END (the payoff), never in the first half, or they leave.
 - What is written on screen is exactly what is said; every line changes something on screen.
 Structure:
-1. hook: 5-10 words, shown as a giant headline from the first frame, ALWAYS starting with "Claude," (Hebrew "קלוד,"):
-   the viewer's own question to Claude (22.11, Inbar: the "Claude, ..." format is what blows up right now). Most
+1. hook: 5-10 words, shown as a giant headline from the first frame. {HOOK_OPENER[lang]} Most
    viewers swipe away within 2-3 seconds, so it must be understood in ONE second, be about something the viewer owns
    or does every day, and carry a threat, a weird detail or a concrete number. Its angle can use one of these formulas:
 {HOOK_FORMULAS}
@@ -350,7 +371,7 @@ Structure:
    researched fact has a number, the hook says that number and its line uses action "count" with that value.
    Don't put "Secret" in every title: vary the title words.
    Never a soft or generic opener ("ever wondered how Wi-Fi works?", "in this video", "let's talk about").
-   Also give "hook_options" (each also starting with "Claude,"): 2 MORE hooks for the same script, each on a DIFFERENT formula, same rules, with one
+   Also give "hook_options" (same opener rule): 2 MORE hooks for the same script, each on a DIFFERENT formula, same rules, with one
    *key word* each. The best-scoring of the three is used.
    The hook = the viewer's pain or risk + an open loop. Bad: "How Face ID works". Good: "Your face unlocks more than your *phone*".
 2. contrast: one short line that makes the hook worse or flips what they believe (a number, "and you said yes to it",
@@ -404,8 +425,10 @@ Return JSON only:
             script = retry
     script = _gate(script, prompt, lang)
     first = script["segments"][0]
-    if not _asks_claude(first["text"]):   # the rewrites missed it: the opener is never skipped
-        first["text"] = f"{CLAUDE[lang]} {first['text']}"
+    if lang == "en" and not _asks_claude(first["text"]):   # the rewrites missed it: the opener is never skipped
+        first["text"] = f"{CLAUDE} {first['text']}"
+    elif lang == "he" and not _opener_ok(first["text"], lang):
+        first["text"] = re.sub(r"^\W*(קלוד|claude)\W*", "", first["text"], flags=re.I).strip()
         first.pop("say", None)
     return {**script, "lang": lang, "sources": found["sources"], "researched": bool(found["facts"])}
 
@@ -419,9 +442,10 @@ def _gate(script: dict[str, Any], prompt: str, lang: str) -> dict[str, Any]:
         machine = _rule_problems(script["segments"], lang)
         print(f"[channel] rulebook try {attempt + 1}: {j and {k: round(v) for k, v in j['scores'].items()}} machine={machine}", file=sys.stderr)
         bh = j["best_hook"].strip() if j else ""
-        if bh and "*" in bh and _asks_claude(bh) and 3 <= len(bh.split()) <= 12 and bh.replace("*", "") != script["segments"][0]["text"].replace("*", ""):
+        if bh and "*" in bh and _opener_ok(bh, lang) and 3 <= len(bh.split()) <= 12 and bh.replace("*", "") != script["segments"][0]["text"].replace("*", ""):
             print(f"[channel] judge hook: {bh}", file=sys.stderr)
             script["segments"][0]["text"] = bh
+            script["segments"][0].pop("say", None)   # the voice reads "say": a stale one = captions that don't match the speech
         score = (j["avg"] if j else 7.5) - 0.5 * len(machine)
         if score > best_score:
             best, best_score, best_j = script, score, j
@@ -438,7 +462,7 @@ def _gate(script: dict[str, Any], prompt: str, lang: str) -> dict[str, Any]:
 
 VOICE = """This {lang} Reel script is right on facts and structure but sounds like AI (it scored {r13}/10 on R13 below).
 Rewrite ONLY the wording of each line so a real person would say it out loud. Keep the same number of lines, the same
-order, the same facts and numbers, line 1 still starting with "{claude}", the last line still the follow line, and
+order, the same facts and numbers, {opener}, the last line still the follow line, and
 every other field of each line (focus, action, target, symbol, label, value, suffix, tone) exactly as it is.
 {rule}
 {lang_rules}
@@ -455,11 +479,11 @@ def _voice_pass(script: dict[str, Any], j: dict[str, Any] | None, lang: str) -> 
         return script
     rule = RULEBOOK[RULEBOOK.index("R13 "):RULEBOOK.index("R11 ")]
     try:
-        out = _gemini(VOICE.format(lang=LANG_NAME[lang], r13=round(r13), claude=CLAUDE[lang], rule=rule, fix=j["fix"],
+        out = _gemini(VOICE.format(lang=LANG_NAME[lang], r13=round(r13), opener='line 1 still starting with "Claude,"' if lang == "en" else 'never "קלוד" or "Claude"', rule=rule, fix=j["fix"],
                                    lang_rules=HEBREW if lang == "he" else ENGLISH,
                                    script=json.dumps({"segments": script["segments"]}, ensure_ascii=False)), temperature=0.7)
         cand = _valid_script({**script, "segments": out["segments"]}, lang)
-        if len(cand["segments"]) != len(script["segments"]) or not _asks_claude(cand["segments"][0]["text"]):
+        if len(cand["segments"]) != len(script["segments"]) or not _opener_ok(cand["segments"][0]["text"], lang):
             raise RuntimeError("voice pass changed the shape")
         j2 = judge_script(cand, lang, [])
         r2 = j2["scores"].get("R13", 0) if j2 else 0
