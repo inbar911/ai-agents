@@ -153,7 +153,9 @@ class TooLong(ValueError):
 
 SHORTEN = """Cut this whiteboard script to 110-140 spoken words in total. Keep the exact same JSON shape and ids, keep line 1
 (Noa's "Claude, ..." question) and the last "Follow." line, keep the explanation's cause-and-effect chain. Merge or drop
-lines, shorten wordy ones; drop board items whose line was dropped. Return only the JSON.
+lines, shorten wordy ones. Keep EVERY panel (3-4 panels, each with its items); only drop an item whose line was
+dropped. No acronyms or tech terms (no ERM, LRA, motor names): say the everyday thing ("a tiny spinning weight", "a
+little spring that shakes"). Return only the JSON.
 
 {script}"""
 
@@ -287,7 +289,10 @@ def _draft(topic: str, notes: str | None, found: dict[str, Any]) -> dict[str, An
             except TooLong as e:
                 # 26.11: three fresh drafts all ran long and the video was dropped; cutting the draft fits it
                 print(f"[board] draft {attempt + 1} {e}, shortening")
-                s = validate(gemini_json(SHORTEN.format(script=json.dumps(raw, ensure_ascii=False)), .3), strict=attempt < 2)
+                try:
+                    s = validate(gemini_json(SHORTEN.format(script=json.dumps(raw, ensure_ascii=False)), .3), strict=attempt < 2)
+                except ValueError as e2:
+                    raise ValueError(f"shortened draft: {e2}") from e2
             return {**s, "sources": found["sources"]}
         except Exception as e:  # noqa: BLE001 — a broken draft gets another try
             last = e
