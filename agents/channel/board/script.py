@@ -147,6 +147,17 @@ def _norm(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "", s.lower())
 
 
+class TooLong(ValueError):
+    """The draft is fine but wordy; the Groq fallback (Gemini quota out) writes 190-280 words every time."""
+
+
+SHORTEN = """Cut this whiteboard script to 110-140 spoken words in total. Keep the exact same JSON shape and ids, keep line 1
+(Noa's "Claude, ..." question) and the last "Follow." line, keep the explanation's cause-and-effect chain. Merge or drop
+lines, shorten wordy ones; drop board items whose line was dropped. Return only the JSON.
+
+{script}"""
+
+
 def validate(s: Any, strict: bool = True) -> dict[str, Any]:
     if not isinstance(s, dict) or not isinstance(s.get("lines"), list):
         raise ValueError("no lines")
@@ -166,7 +177,7 @@ def validate(s: Any, strict: bool = True) -> dict[str, Any]:
     words = sum(len(L["text"].split()) for L in lines)
     # explaining in full sentences runs long (19.11: drafts of 166-172 words); the last try only has to fit ~60 s
     if not 55 <= words <= (185 if strict else 210):
-        raise ValueError(f"{words} words (keep it to 100-145)")
+        raise (TooLong if words > 55 else ValueError)(f"{words} words (keep it to 100-145)")
     bad = jargon(lines)
     if bad and strict:   # the last try is let through rather than losing the video
         raise ValueError(f"jargon a 12-year-old won't know, say the everyday thing instead: {', '.join(bad)}")
@@ -270,7 +281,13 @@ def _draft(topic: str, notes: str | None, found: dict[str, Any]) -> dict[str, An
         try:
             # a rejected draft's reason goes back to the writer, so the next try fixes it instead of guessing
             fix = "; ".join(x for x in (notes, f"Your last draft was rejected: {last}" if last else None) if x) or None
-            s = validate(gemini_json(_prompt(topic, found["facts"], fix), .85), strict=attempt < 2)
+            raw = gemini_json(_prompt(topic, found["facts"], fix), .85)
+            try:
+                s = validate(raw, strict=attempt < 2)
+            except TooLong as e:
+                # 26.11: three fresh drafts all ran long and the video was dropped; cutting the draft fits it
+                print(f"[board] draft {attempt + 1} {e}, shortening")
+                s = validate(gemini_json(SHORTEN.format(script=json.dumps(raw, ensure_ascii=False)), .3), strict=attempt < 2)
             return {**s, "sources": found["sources"]}
         except Exception as e:  # noqa: BLE001 — a broken draft gets another try
             last = e
