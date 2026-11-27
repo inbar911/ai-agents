@@ -130,7 +130,7 @@ def publish(v: dict[str, Any]) -> int:
 
 def queued_ideas(lang: str) -> list[dict[str, Any]]:
     """Ideas Inbar handed to the agent in the dashboard's idea lab, oldest first, in this channel's language."""
-    rows = sb().table("video_ideas").select("id,idea,hooks").eq("target", "agent").eq("status", "queued").order("created_at").execute().data or []
+    rows = sb().table("video_ideas").select("id,idea,hooks,script,original").eq("target", "agent").eq("status", "queued").order("created_at").execute().data or []
     return [r for r in rows if bool(re.search("[\u0590-\u05FF]", r["idea"])) == (lang == "he")]
 
 
@@ -144,11 +144,11 @@ def _build(topic: str, lang: str, palette: str, hooks: list[str] | None, notes: 
     return {**v, "work": work, "review": critic.review(v["file"], v, lang)}
 
 
-def reviewed(topic: str, lang: str, palette: str, hooks: list[str] | None, left: int, inbars: bool = False) -> dict[str, Any] | None:
+def reviewed(topic: str, lang: str, palette: str, hooks: list[str] | None, left: int, inbars: bool = False, script: str | None = None) -> dict[str, Any] | None:
     """Make the video and let the critic watch it. Weak: remake it once on the SAME idea with the critic's notes, if the time
     budget still covers the remake and every video after it. Return the better version, or None if both are weak —
     except Inbar's own ideas (`inbars`), which are never dropped: they always go out in their best version."""
-    first = _build(topic, lang, palette, hooks, None)
+    first = _build(topic, lang, palette, hooks, script)
     r = first["review"]
     if not r or r["score"] >= critic.BAR:
         return first
@@ -215,6 +215,9 @@ def run() -> dict[str, Any]:
         queue = queued_ideas(lang)[:count]
         from_queue = {q["idea"]: q["id"] for q in queue}
         queue_hooks = {q["idea"]: q.get("hooks") or [] for q in queue}
+        # a script Inbar approved live in the dashboard's call room (/room) is the script: the writer follows it, not a fresh draft
+        queue_notes = {q["idea"]: f"Inbar approved this script with his team. Follow it closely, keep its lines, facts and order; only adapt it to the format:\n{q['script']}"
+                       for q in queue if q.get("script") and (q.get("original") or "").startswith("🎥 חדר:")}
         try:
             topics = list(from_queue) + (writer.pick_topics(min(count - len(queue), 6), done, request(), lang) if count > len(queue) else [])
         except Exception as e:  # noqa: BLE001
@@ -223,7 +226,7 @@ def run() -> dict[str, Any]:
         for topic in topics:
             try:
                 left = total - n - 1   # videos still to make after this one
-                video = reviewed(topic, lang, PALETTES[(len(rows) + n) % len(PALETTES)], queue_hooks.get(topic), left, topic in from_queue)
+                video = reviewed(topic, lang, PALETTES[(len(rows) + n) % len(PALETTES)], queue_hooks.get(topic), left, topic in from_queue, queue_notes.get(topic))
                 if video is None:
                     failed.append(f"{FLAG[lang]} {topic}: המבקר פסל גם אחרי תיקון")
                     n += 1
